@@ -1,0 +1,209 @@
+// Prisma schema — Sistem HR
+// Datasource: MySQL local. Atur DATABASE_URL di .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ RBAC: Role & Permission (bisa ditambah & diatur authority) ============
+
+model Permission {
+  id        Int              @id @default(autoincrement())
+  key       String           @unique // contoh: "employees.create"
+  label     String
+  group     String // pengelompokan di UI, contoh: "Karyawan"
+  roles     RolePermission[]
+  createdAt DateTime         @default(now())
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false) // role bawaan tidak bisa dihapus
+  color       String           @default("#6366f1")
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int
+
+  @@id([roleId, permissionId])
+}
+
+// ============ Department (bisa ditambahkan) ============
+
+model Department {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  description String?
+  users       User[]
+  schedule    WorkSchedule?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+// ============ User / Karyawan ============
+
+model User {
+  id                  Int      @id @default(autoincrement())
+  username            String   @unique
+  email               String?  @unique
+  passwordHash        String
+  fullName            String
+  birthDate           DateTime?
+  joinDate            DateTime @default(now())
+  photo               String?  @db.LongText // data URL foto profil (opsional)
+  isActive            Boolean  @default(true)
+
+  roleId              Int
+  role                Role       @relation(fields: [roleId], references: [id])
+  departmentId        Int?
+  department          Department? @relation(fields: [departmentId], references: [id])
+
+  baseSalary          Float    @default(0)   // gaji pokok
+  performanceAllowance Float   @default(0)   // tunjangan kinerja maksimal (dikali skor)
+
+  attendances         Attendance[]
+  leaveRequests       LeaveRequest[]      @relation("Requester")
+  reviewedLeaves      LeaveRequest[]      @relation("Reviewer")
+  performanceRecords  PerformanceRecord[]
+  payrolls            Payroll[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ============ Jam kerja & toleransi (per department, null = default global) ============
+
+model WorkSchedule {
+  id                 Int         @id @default(autoincrement())
+  departmentId       Int?        @unique // null = pengaturan default global
+  department         Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  checkInTime        String      @default("08:00") // HH:mm
+  checkOutTime       String      @default("17:00") // HH:mm
+  lateToleranceMin   Int         @default(15)      // toleransi terlambat (menit)
+  earlyLeaveTolMin   Int         @default(0)       // toleransi pulang cepat (menit)
+  workDays           String      @default("1,2,3,4,5") // 0=Min ... 6=Sab
+  updatedAt          DateTime    @updatedAt
+}
+
+// ============ Absensi ============
+
+enum CheckInStatus {
+  ON_TIME
+  LATE
+}
+
+enum CheckOutStatus {
+  ON_TIME
+  EARLY_LEAVE
+}
+
+model Attendance {
+  id             Int             @id @default(autoincrement())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  date           DateTime        @db.Date // tanggal absensi (unik per user per hari)
+  checkInAt      DateTime?
+  checkInStatus  CheckInStatus?
+  checkInPhoto   String?         @db.LongText
+  lateMinutes    Int             @default(0)
+  checkOutAt     DateTime?
+  checkOutStatus CheckOutStatus?
+  checkOutPhoto  String?         @db.LongText
+  earlyMinutes   Int             @default(0)
+  workedMinutes  Int             @default(0)
+  createdAt      DateTime        @default(now())
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+// ============ Cuti ============
+
+enum LeaveType {
+  ANNUAL // Cuti Tahunan
+  SICK // Sakit
+  PERMISSION // Izin
+  UNPAID // Tanpa Gaji
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LeaveRequest {
+  id           Int         @id @default(autoincrement())
+  user         User        @relation("Requester", fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  type         LeaveType   @default(ANNUAL)
+  startDate    DateTime    @db.Date
+  endDate      DateTime    @db.Date
+  reason       String      @db.Text
+  status       LeaveStatus @default(PENDING)
+  reviewedBy   User?       @relation("Reviewer", fields: [reviewedById], references: [id])
+  reviewedById Int?
+  reviewedAt   DateTime?
+  reviewNote   String?     @db.Text
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
+}
+
+// ============ Kinerja & Penggajian (pembobotan) ============
+
+model KpiMetric {
+  id          Int                 @id @default(autoincrement())
+  name        String
+  description String?
+  weight      Float               @default(0) // bobot (%) — total semua metric idealnya 100
+  active      Boolean             @default(true)
+  records     PerformanceRecord[]
+  createdAt   DateTime            @default(now())
+}
+
+model PerformanceRecord {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  metric    KpiMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  metricId  Int
+  period    String // YYYY-MM
+  score     Float     @default(0) // capaian 0-100
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, metricId, period])
+  @@index([period])
+}
+
+model Payroll {
+  id                 Int      @id @default(autoincrement())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             Int
+  period             String // YYYY-MM
+  baseSalary         Float
+  performanceScore   Float // skor berbobot 0-100
+  performanceAmount  Float // tunjangan kinerja yang didapat
+  deductions         Float    @default(0)
+  totalSalary        Float
+  note               String?  @db.Text
+  generatedAt        DateTime @default(now())
+
+  @@unique([userId, period])
+}
