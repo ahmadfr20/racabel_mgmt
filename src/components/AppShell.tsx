@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  Building2, CalendarClock, CalendarDays, ChevronDown, LayoutDashboard,
-  LogOut, Menu, Moon, Settings, ShieldCheck, ShoppingBag, Sun, Users, Wallet, X,
+  CalendarClock, CalendarDays, ChevronDown, LayoutDashboard,
+  LogOut, Menu, Moon, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
+  Store, Sun, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
@@ -27,13 +28,15 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, anyOf: ["dashboard.view"] },
-  { href: "/attendance", label: "Absensi", icon: CalendarClock, anyOf: ["attendance.checkin", "attendance.view_all"] },
-  { href: "/leave", label: "Cuti", icon: CalendarDays, anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
-  { href: "/employees", label: "Karyawan", icon: Users, anyOf: ["employees.view"] },
-  { href: "/payroll", label: "Kinerja & Gaji", icon: Wallet, anyOf: ["payroll.view", "payroll.manage"] },
-  { href: "/tiktok", label: "TikTok Shop", icon: ShoppingBag, anyOf: ["dashboard.view"] },
-  { href: "/settings", label: "Pengaturan", icon: Settings, anyOf: ["roles.manage", "departments.manage", "settings.manage"] },
+  { href: "/dashboard",  label: "Dashboard",    icon: LayoutDashboard, anyOf: ["dashboard.view"] },
+  { href: "/attendance", label: "Absensi",       icon: CalendarClock,   anyOf: ["attendance.checkin", "attendance.view_all"] },
+  { href: "/leave",      label: "Cuti",          icon: CalendarDays,    anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
+  { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
+  { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
+  { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
+  { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["dashboard.view"] },
+  { href: "/shopee",     label: "Shopee",        icon: ShoppingCart,    anyOf: ["dashboard.view"] },
+  { href: "/settings",   label: "Pengaturan",    icon: Settings,        anyOf: ["roles.manage", "departments.manage", "settings.manage"] },
 ];
 
 export function AppShell({ user, children }: { user: ShellUser; children: React.ReactNode }) {
@@ -146,9 +149,8 @@ function SidebarContent({
   return (
     <>
       <div className="flex h-16 items-center gap-2.5 border-b border-slate-100 dark:border-slate-700 px-5">
-        <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
-          <Building2 className="h-5 w-5" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo_racabel.svg" className="h-9 w-9 dark:brightness-0 dark:invert" alt="Racabel" />
         <span className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-100">Racabel HQ Management</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">

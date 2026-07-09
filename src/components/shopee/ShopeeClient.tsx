@@ -2,13 +2,13 @@
 
 import { MarketplaceClient } from "@/components/marketplace/MarketplaceClient";
 
-export function TikTokClient() {
+export function ShopeeClient() {
   return (
     <MarketplaceClient
       config={{
-        name: "TikTok Shop",
-        apiPath: "/api/tiktok/analytics",
-        envKeyHint: "TIKTOK_APP_KEY",
+        name: "Shopee",
+        apiPath: "/api/shopee/analytics",
+        envKeyHint: "SHOPEE_PARTNER_ID",
       }}
     />
   );

@@ -5,7 +5,11 @@
       "Skill(superpowers:executing-plans)",
       "Bash(npx tsc *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(ls src/app/api/)",
+      "Bash(ls src/components/)"
     ]
   }
 }

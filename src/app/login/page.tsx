@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, Loader2, Lock, User } from "lucide-react";
+import { Loader2, Lock, User } from "lucide-react";
 
 export default function LoginPage() {
   return (
@@ -42,38 +42,107 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      {/* Panel kiri — branding */}
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-brand-700 p-12 text-white">
-        <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-brand-500/40 blur-3xl" />
-        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-indigo-400/30 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 backdrop-blur">
-            <Building2 className="h-6 w-6" />
+
+      {/* ── Panel kiri — showcase produk ── */}
+      <div className="relative hidden lg:flex flex-col overflow-hidden bg-[#08090e]">
+
+        {/* Subtle dot-grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+
+        {/* Gradient vignette — top & bottom */}
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#08090e] to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#08090e] via-[#08090e]/80 to-transparent z-10 pointer-events-none" />
+
+        {/* Logo — top left */}
+        <div className="relative z-20 flex items-center gap-3 p-10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo_racabel.svg" className="h-9 w-9 brightness-0 invert" alt="Racabel" />
+          <span className="text-sm font-semibold tracking-wide text-white/70">
+            Racabel HQ Management
+          </span>
+        </div>
+
+        {/* ── Product collage ── */}
+        <div className="relative flex-1 flex items-center justify-center px-10">
+          <div className="relative w-full" style={{ height: 380 }}>
+
+            {/* img_1 — rings on hand, portrait, main left */}
+            <div
+              className="absolute left-0 top-8 w-[205px] h-[255px] rounded-3xl overflow-hidden
+                         shadow-[0_24px_64px_rgba(0,0,0,0.7)] ring-1 ring-white/10
+                         -rotate-2 transition-transform hover:rotate-0 hover:scale-[1.02] duration-500"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img_1.png" alt="Racabel rings" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            </div>
+
+            {/* img_2 — bracelet, portrait, right top */}
+            <div
+              className="absolute right-0 top-0 w-[158px] h-[198px] rounded-3xl overflow-hidden
+                         shadow-[0_24px_64px_rgba(0,0,0,0.7)] ring-1 ring-white/10
+                         rotate-[2deg] transition-transform hover:rotate-0 hover:scale-[1.02] duration-500"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img_2.png" alt="Racabel bracelet" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            </div>
+
+            {/* img_3 — three rings flat-lay, right bottom */}
+            <div
+              className="absolute right-6 bottom-0 w-[148px] h-[140px] rounded-3xl overflow-hidden
+                         shadow-[0_24px_64px_rgba(0,0,0,0.7)] ring-1 ring-white/10
+                         -rotate-1 transition-transform hover:rotate-0 hover:scale-[1.02] duration-500"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img_3.png" alt="Racabel ring collection" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+            </div>
+
+            {/* Decorative connector line between cards */}
+            <div className="absolute top-[120px] left-[200px] right-[158px] h-px bg-gradient-to-r from-white/0 via-white/15 to-white/0" />
+
+            {/* Floating label chip */}
+            <div className="absolute left-4 bottom-[72px] flex items-center gap-2 rounded-full bg-white/8 backdrop-blur-md border border-white/10 px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-medium text-white/70 tracking-wide">Koleksi Terbaru</span>
+            </div>
           </div>
-          <span className="text-lg font-semibold tracking-tight">Racabel HQ Management</span>
         </div>
-        <div className="relative space-y-4">
-          <h1 className="text-4xl font-bold leading-tight">
-            Kelola tim Anda,
-            <br /> dengan lebih mudah.
-          </h1>
-          <p className="max-w-md text-brand-100">
-            Absensi kamera, pengajuan cuti, analitik kinerja, dan penggajian
-            berbasis capaian — semua dalam satu dashboard.
+
+        {/* ── Tagline — bottom ── */}
+        <div className="relative z-20 px-10 pb-10 space-y-3">
+          <p className="text-xs font-semibold tracking-[0.18em] text-white/30 uppercase">
+            Racabel Jewelry
           </p>
-        </div>
-        <div className="relative text-sm text-brand-200">
-          © {new Date().getFullYear()} Racabel HQ Management — Internal Use
+          <h2 className="text-3xl font-bold leading-tight text-white">
+            Kelola tim Anda,
+            <br />
+            <span className="text-white/50">dengan lebih mudah.</span>
+          </h2>
+          <p className="text-sm text-white/35 max-w-[280px] leading-relaxed">
+            Absensi, cuti, kinerja, dan penggajian berbasis capaian — semua dalam satu dashboard.
+          </p>
+          <p className="pt-2 text-xs text-white/20">
+            © {new Date().getFullYear()} Racabel HQ Management — Internal Use
+          </p>
         </div>
       </div>
 
-      {/* Panel kanan — form */}
+      {/* ── Panel kanan — form ── */}
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-sm animate-fade-in">
+
+          {/* Mobile logo (hidden on desktop) */}
           <div className="mb-8 lg:hidden flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-600 text-white">
-              <Building2 className="h-6 w-6" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo_racabel.svg" className="h-11 w-11" alt="Racabel" />
             <span className="text-lg font-semibold dark:text-slate-100">Racabel HQ Management</span>
           </div>
 

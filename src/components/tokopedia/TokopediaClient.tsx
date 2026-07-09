@@ -2,13 +2,13 @@
 
 import { MarketplaceClient } from "@/components/marketplace/MarketplaceClient";
 
-export function TikTokClient() {
+export function TokopediaClient() {
   return (
     <MarketplaceClient
       config={{
-        name: "TikTok Shop",
-        apiPath: "/api/tiktok/analytics",
-        envKeyHint: "TIKTOK_APP_KEY",
+        name: "Tokopedia",
+        apiPath: "/api/tokopedia/analytics",
+        envKeyHint: "TOKOPEDIA_CLIENT_ID",
       }}
     />
   );
