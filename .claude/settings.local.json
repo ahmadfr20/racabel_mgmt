@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:executing-plans)",
+      "Bash(npx tsc *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

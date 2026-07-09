@@ -5,9 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Building2, CalendarClock, CalendarDays, ChevronDown, LayoutDashboard,
-  LogOut, Menu, Settings, ShieldCheck, Users, Wallet, X,
+  LogOut, Menu, Moon, Settings, ShieldCheck, ShoppingBag, Sun, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
 
 export interface ShellUser {
   fullName: string;
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
   { href: "/leave", label: "Cuti", icon: CalendarDays, anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
   { href: "/employees", label: "Karyawan", icon: Users, anyOf: ["employees.view"] },
   { href: "/payroll", label: "Kinerja & Gaji", icon: Wallet, anyOf: ["payroll.view", "payroll.manage"] },
+  { href: "/tiktok", label: "TikTok Shop", icon: ShoppingBag, anyOf: ["dashboard.view"] },
   { href: "/settings", label: "Pengaturan", icon: Settings, anyOf: ["roles.manage", "departments.manage", "settings.manage"] },
 ];
 
@@ -39,6 +41,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { theme, toggle } = useTheme();
 
   const items = NAV.filter((n) => n.anyOf.some((p) => user.permissions.includes(p)));
 
@@ -53,7 +56,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   return (
     <div className="min-h-screen">
       {/* Sidebar desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 lg:flex">
         <SidebarContent items={items} pathname={pathname} />
       </aside>
 
@@ -61,9 +64,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-white">
+          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-slate-900">
             <div className="flex justify-end p-3">
-              <button onClick={() => setMobileOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+              <button onClick={() => setMobileOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -74,43 +77,54 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
       {/* Konten */}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-6">
-          <button className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)}>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-4 backdrop-blur sm:px-6">
+          <button className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
           <div className="hidden lg:block" />
 
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            {/* Toggle dark/light */}
             <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-slate-100"
+              onClick={toggle}
+              className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              title={theme === "dark" ? "Ganti ke light mode" : "Ganti ke dark mode"}
             >
-              <Avatar photo={user.photo} initials={initials} />
-              <div className="hidden text-left sm:block">
-                <p className="text-sm font-semibold leading-tight text-slate-800">{user.fullName}</p>
-                <p className="text-xs text-slate-500">{user.role.name}</p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-800">{user.fullName}</p>
-                    <p className="text-xs text-slate-500">
-                      @{user.username} · {user.department?.name ?? "—"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={logout}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut className="h-4 w-4" /> Keluar
-                  </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <Avatar photo={user.photo} initials={initials} />
+                <div className="hidden text-left sm:block">
+                  <p className="text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">{user.fullName}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{user.role.name}</p>
                 </div>
-              </>
-            )}
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+                    <div className="border-b border-slate-100 dark:border-slate-700 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user.fullName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        @{user.username} · {user.department?.name ?? "—"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={logout}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <LogOut className="h-4 w-4" /> Keluar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -131,11 +145,11 @@ function SidebarContent({
 }) {
   return (
     <>
-      <div className="flex h-16 items-center gap-2.5 border-b border-slate-100 px-5">
+      <div className="flex h-16 items-center gap-2.5 border-b border-slate-100 dark:border-slate-700 px-5">
         <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
           <Building2 className="h-5 w-5" />
         </div>
-        <span className="text-base font-bold tracking-tight text-slate-800">HR System</span>
+        <span className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-100">Racabel HQ Management</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {items.map((item) => {
@@ -148,16 +162,18 @@ function SidebarContent({
               onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100"
+                active
+                  ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               )}
             >
-              <Icon className={cn("h-[18px] w-[18px]", active ? "text-brand-600" : "text-slate-400")} />
+              <Icon className={cn("h-[18px] w-[18px]", active ? "text-brand-600 dark:text-brand-400" : "text-slate-400 dark:text-slate-500")} />
               {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="border-t border-slate-100 p-4 text-xs text-slate-400">
+      <div className="border-t border-slate-100 dark:border-slate-700 p-4 text-xs text-slate-400">
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5" /> Role & authority aktif
         </div>
@@ -172,7 +188,7 @@ function Avatar({ photo, initials }: { photo: string | null; initials: string })
     return <img src={photo} alt="" className="h-9 w-9 rounded-full object-cover" />;
   }
   return (
-    <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+    <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 dark:bg-brand-900/30 text-sm font-semibold text-brand-700 dark:text-brand-300">
       {initials}
     </div>
   );

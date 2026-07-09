@@ -50,7 +50,7 @@ function LoginForm() {
           <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 backdrop-blur">
             <Building2 className="h-6 w-6" />
           </div>
-          <span className="text-lg font-semibold tracking-tight">HR System</span>
+          <span className="text-lg font-semibold tracking-tight">Racabel HQ Management</span>
         </div>
         <div className="relative space-y-4">
           <h1 className="text-4xl font-bold leading-tight">
@@ -63,7 +63,7 @@ function LoginForm() {
           </p>
         </div>
         <div className="relative text-sm text-brand-200">
-          © {new Date().getFullYear()} HR System — Internal Use
+          © {new Date().getFullYear()} Racabel HQ Management — Internal Use
         </div>
       </div>
 
@@ -74,11 +74,11 @@ function LoginForm() {
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-600 text-white">
               <Building2 className="h-6 w-6" />
             </div>
-            <span className="text-lg font-semibold">HR System</span>
+            <span className="text-lg font-semibold dark:text-slate-100">Racabel HQ Management</span>
           </div>
 
-          <h2 className="text-2xl font-bold text-slate-900">Selamat datang 👋</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Selamat datang 👋</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Masuk untuk melanjutkan ke dashboard Anda.
           </p>
 
@@ -114,7 +114,7 @@ function LoginForm() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
                 {error}
               </div>
             )}
@@ -125,10 +125,10 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl bg-slate-50 p-4 text-xs text-slate-500">
-            <p className="font-medium text-slate-600">Akun demo:</p>
+          <div className="mt-6 rounded-xl bg-slate-50 p-4 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <p className="font-medium text-slate-600 dark:text-slate-300">Akun demo:</p>
             <p className="mt-1">admin / admin123 &nbsp;·&nbsp; hr / password123 &nbsp;·&nbsp; budi / password123</p>
-            <p className="mt-2 text-slate-400">Registrasi hanya dapat dilakukan oleh Admin dari dalam aplikasi.</p>
+            <p className="mt-2 text-slate-400 dark:text-slate-500">Registrasi hanya dapat dilakukan oleh Admin dari dalam aplikasi.</p>
           </div>
         </div>
       </div>
