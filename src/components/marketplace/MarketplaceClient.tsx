@@ -10,6 +10,9 @@ export interface PlatformConfig {
   name: string;
   apiPath: string;
   envKeyHint: string;
+  // Jika platform pakai OAuth (mis. TikTok Shop), isi endpoint mulai-otorisasi
+  // agar muncul tombol "Hubungkan Akun" alih-alih sekadar petunjuk .env.
+  connectPath?: string;
 }
 
 type TrendPoint = { date: string; revenue: number; orders: number };
@@ -46,6 +49,18 @@ export function MarketplaceClient({ config }: { config: PlatformConfig }) {
   const [to,      setTo]      = useState(toISO(new Date()));
   const [data,    setData]    = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notice,  setNotice]  = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+
+  // Tangkap hasil callback OAuth (?tt_connected / ?tt_error) lalu bersihkan URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("tt_connected");
+    const e = sp.get("tt_error");
+    if (c) setNotice({ type: "ok", msg: `Berhasil terhubung${c !== "1" ? ` ke ${c}` : ""}.` });
+    else if (e) setNotice({ type: "err", msg: e });
+    if (c || e) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   const fetchData = useCallback(async (f: string, t: string) => {
     setLoading(true);
@@ -80,15 +95,44 @@ export function MarketplaceClient({ config }: { config: PlatformConfig }) {
         subtitle={`Analitik penjualan produk Racabel di ${config.name}.`}
       />
 
+      {/* Notifikasi hasil koneksi OAuth */}
+      {notice && (
+        <div
+          className={cn(
+            "mb-4 rounded-xl border px-4 py-3 text-sm",
+            notice.type === "ok"
+              ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300"
+              : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300"
+          )}
+        >
+          {notice.type === "ok" ? "✓ " : "⚠ "}
+          {notice.msg}
+        </div>
+      )}
+
       {/* Banner mode demo */}
       {data?.isMock && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
-            <strong>Mode Demo</strong> — Data ini adalah contoh. Hubungkan{" "}
-            <code className="rounded bg-amber-100 dark:bg-amber-900/30 px-1 font-mono text-xs">{config.envKeyHint}</code>{" "}
-            di file <code className="rounded bg-amber-100 dark:bg-amber-900/30 px-1 font-mono text-xs">.env</code> untuk data nyata.
-          </span>
+          {config.connectPath ? (
+            <>
+              <span className="flex-1">
+                <strong>Mode Demo</strong> — Data ini contoh. Hubungkan akun {config.name} Anda untuk menampilkan penjualan nyata.
+              </span>
+              <a
+                href={config.connectPath}
+                className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
+              >
+                Hubungkan Akun {config.name}
+              </a>
+            </>
+          ) : (
+            <span>
+              <strong>Mode Demo</strong> — Data ini adalah contoh. Hubungkan{" "}
+              <code className="rounded bg-amber-100 dark:bg-amber-900/30 px-1 font-mono text-xs">{config.envKeyHint}</code>{" "}
+              di file <code className="rounded bg-amber-100 dark:bg-amber-900/30 px-1 font-mono text-xs">.env</code> untuk data nyata.
+            </span>
+          )}
         </div>
       )}
 

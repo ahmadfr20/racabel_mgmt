@@ -9,6 +9,7 @@ export function TikTokClient() {
         name: "TikTok Shop",
         apiPath: "/api/tiktok/analytics",
         envKeyHint: "TIKTOK_APP_KEY",
+        connectPath: "/api/tiktok/auth",
       }}
     />
   );

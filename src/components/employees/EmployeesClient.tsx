@@ -25,7 +25,18 @@ interface Option { id: number; name: string; color?: string }
 const EMPTY = {
   username: "", password: "", email: "", fullName: "", birthDate: "", joinDate: "",
   roleId: "", departmentId: "", baseSalary: "0", performanceAllowance: "0", isActive: true,
+  photo: "", ktpPhoto: "", address: "", emergencyName: "", emergencyPhone: "",
 };
+
+// Konversi File gambar -> data URL (base64) untuk disimpan di DB.
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boolean; delete: boolean; payroll: boolean } }) {
   const [list, setList] = useState<Employee[]>([]);
@@ -63,9 +74,12 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
     setError("");
     setOpen(true);
   }
-  function openEdit(e: Employee) {
+  async function openEdit(e: Employee) {
     setEditing(e);
+    setError("");
+    // Isi cepat dari data list, lalu lengkapi detail (foto/alamat/kontak) dari server.
     setForm({
+      ...EMPTY,
       username: e.username, password: "", email: e.email ?? "", fullName: e.fullName,
       birthDate: e.birthDate ? e.birthDate.slice(0, 10) : "",
       joinDate: e.joinDate ? e.joinDate.slice(0, 10) : "",
@@ -73,8 +87,15 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
       baseSalary: String(e.baseSalary), performanceAllowance: String(e.performanceAllowance),
       isActive: e.isActive,
     });
-    setError("");
     setOpen(true);
+    try {
+      const d = await apiFetch<any>(`/api/employees/${e.id}`);
+      setForm((f: any) => ({
+        ...f,
+        photo: d.photo ?? "", ktpPhoto: d.ktpPhoto ?? "", address: d.address ?? "",
+        emergencyName: d.emergencyName ?? "", emergencyPhone: d.emergencyPhone ?? "",
+      }));
+    } catch { /* biarkan form dasar */ }
   }
 
   async function submit(ev: React.FormEvent) {
@@ -86,6 +107,8 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
         email: form.email, fullName: form.fullName, birthDate: form.birthDate, joinDate: form.joinDate,
         roleId: Number(form.roleId), departmentId: form.departmentId ? Number(form.departmentId) : null,
         baseSalary: Number(form.baseSalary), performanceAllowance: Number(form.performanceAllowance),
+        photo: form.photo, ktpPhoto: form.ktpPhoto, address: form.address,
+        emergencyName: form.emergencyName, emergencyPhone: form.emergencyPhone,
       };
       if (editing) {
         payload.isActive = form.isActive;
@@ -116,6 +139,13 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
   }
 
   const set = (k: string) => (ev: any) => setForm((f: any) => ({ ...f, [k]: ev.target.value }));
+  const setFile = (k: string) => async (ev: any) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { setError("Ukuran gambar maksimal 4MB."); return; }
+    const url = await fileToDataUrl(file);
+    setForm((f: any) => ({ ...f, [k]: url }));
+  };
 
   return (
     <div>
@@ -264,6 +294,53 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
             <div>
               <label className="label">Tunjangan Kinerja Maks (Rp)</label>
               <input className="input" type="number" min={0} value={form.performanceAllowance} onChange={set("performanceAllowance")} />
+            </div>
+
+            {/* Data pribadi & dokumen */}
+            <div className="sm:col-span-2 mt-2 border-t border-slate-100 dark:border-slate-700 pt-4">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Data Pribadi & Dokumen</p>
+            </div>
+
+            <div>
+              <label className="label">Foto Profil</label>
+              <div className="flex items-center gap-3">
+                {form.photo
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={form.photo} alt="" className="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+                  : <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-400">Foto</div>}
+                <div className="flex flex-col gap-1">
+                  <input type="file" accept="image/*" onChange={setFile("photo")} className="text-xs" />
+                  {form.photo && <button type="button" className="text-xs text-red-500 text-left" onClick={() => setForm((f: any) => ({ ...f, photo: "" }))}>Hapus foto</button>}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Foto KTP</label>
+              <div className="flex items-center gap-3">
+                {form.ktpPhoto
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={form.ktpPhoto} alt="" className="h-16 w-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+                  : <div className="grid h-16 w-24 place-items-center rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-400">KTP</div>}
+                <div className="flex flex-col gap-1">
+                  <input type="file" accept="image/*" onChange={setFile("ktpPhoto")} className="text-xs" />
+                  {form.ktpPhoto && <button type="button" className="text-xs text-red-500 text-left" onClick={() => setForm((f: any) => ({ ...f, ktpPhoto: "" }))}>Hapus KTP</button>}
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="label">Alamat</label>
+              <textarea className="input min-h-[70px]" value={form.address} onChange={set("address")} placeholder="Alamat lengkap tempat tinggal" />
+            </div>
+
+            <div>
+              <label className="label">Kontak Darurat — Nama</label>
+              <input className="input" value={form.emergencyName} onChange={set("emergencyName")} placeholder="Nama pemilik kontak" />
+            </div>
+            <div>
+              <label className="label">Kontak Darurat — No. Telepon</label>
+              <input className="input" value={form.emergencyPhone} onChange={set("emergencyPhone")} placeholder="08xxxxxxxxxx" />
             </div>
           </div>
 

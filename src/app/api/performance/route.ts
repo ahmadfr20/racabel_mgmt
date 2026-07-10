@@ -12,7 +12,8 @@ export const GET = handle(async (req: NextRequest) => {
   const period = req.nextUrl.searchParams.get("period") || currentPeriod();
 
   const [metrics, records, user] = await Promise.all([
-    prisma.kpiMetric.findMany({ where: { active: true }, orderBy: { id: "asc" } }),
+    // Metrik yang berlaku untuk user: KPI umum (userId null) + KPI khusus miliknya.
+    prisma.kpiMetric.findMany({ where: { active: true, OR: [{ userId: null }, { userId }] }, orderBy: { id: "asc" } }),
     prisma.performanceRecord.findMany({ where: { userId, period } }),
     prisma.user.findUnique({ where: { id: userId }, select: { fullName: true, baseSalary: true, performanceAllowance: true } }),
   ]);

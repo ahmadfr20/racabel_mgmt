@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchSalesAnalytics, isConnected, tiktokConfigured } from "@/lib/tiktok";
 
 type TrendPoint = { date: string; revenue: number; orders: number };
 type Product = { name: string; sold: number; revenue: number; views: number; conversionRate: number };
@@ -66,12 +67,14 @@ export async function GET(req: NextRequest) {
   const toDate   = searchParams.get("to")   ? new Date(searchParams.get("to")!)   : new Date();
   const fromDate = searchParams.get("from") ? new Date(searchParams.get("from")!) : new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const appKey    = process.env.TIKTOK_APP_KEY;
-  const appSecret = process.env.TIKTOK_APP_SECRET;
-
-  if (appKey && appSecret) {
-    // TODO: implementasi TikTok Shop API saat credentials tersedia
-    // Ganti blok ini dengan real API call ke TikTok Open Platform
+  // Jika app terkonfigurasi & toko sudah diotorisasi, ambil data penjualan nyata.
+  if (tiktokConfigured() && (await isConnected())) {
+    try {
+      const real = await fetchSalesAnalytics(fromDate, toDate);
+      if (real) return NextResponse.json(real);
+    } catch (err) {
+      console.error("[tiktok analytics] gagal ambil data nyata, fallback ke mock:", err);
+    }
   }
 
   return NextResponse.json(generateMockData(fromDate, toDate));

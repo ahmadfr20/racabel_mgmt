@@ -65,6 +65,10 @@ model User {
   birthDate           DateTime?
   joinDate            DateTime @default(now())
   photo               String?  @db.LongText // data URL foto profil (opsional)
+  ktpPhoto            String?  @db.LongText // data URL foto KTP (opsional)
+  address             String?  @db.Text     // alamat lengkap
+  emergencyName       String?               // nama pemilik kontak darurat
+  emergencyPhone      String?               // nomor telepon kontak darurat
   isActive            Boolean  @default(true)
 
   roleId              Int
@@ -80,6 +84,9 @@ model User {
   reviewedLeaves      LeaveRequest[]      @relation("Reviewer")
   performanceRecords  PerformanceRecord[]
   payrolls            Payroll[]
+  assignedKpis        KpiMetric[]         @relation("UserKpis")
+  taskLogs            TaskLog[]
+  pdcas               Pdca[]
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -173,8 +180,14 @@ model KpiMetric {
   description String?
   weight      Float               @default(0) // bobot (%) — total semua metric idealnya 100
   active      Boolean             @default(true)
+  // Jika userId null = KPI umum (berlaku untuk semua karyawan).
+  // Jika terisi = KPI khusus milik karyawan tersebut.
+  userId       Int?
+  assignedUser User?              @relation("UserKpis", fields: [userId], references: [id], onDelete: Cascade)
   records     PerformanceRecord[]
   createdAt   DateTime            @default(now())
+
+  @@index([userId])
 }
 
 model PerformanceRecord {
@@ -206,4 +219,65 @@ model Payroll {
   generatedAt        DateTime @default(now())
 
   @@unique([userId, period])
+}
+
+// Penyimpanan konfigurasi/kredensial runtime (key-value). Dipakai a.l. untuk
+// menyimpan token OAuth integrasi marketplace (TikTok Shop) yang di-refresh berkala.
+model AppConfig {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+// ============ Task Log Harian ============
+
+enum TaskStatus {
+  PLANNED     // Direncanakan
+  IN_PROGRESS // Dikerjakan
+  DONE        // Selesai
+}
+
+model TaskLog {
+  id          Int        @id @default(autoincrement())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  date        DateTime   @db.Date // tanggal pekerjaan
+  title       String
+  description String?    @db.Text
+  status      TaskStatus @default(DONE)
+  hours       Float?     // durasi jam (opsional)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, date])
+  @@index([date])
+}
+
+// ============ Manajemen PDCA (Plan-Do-Check-Act) ============
+
+enum PdcaStatus {
+  PLAN
+  DO
+  CHECK
+  ACT
+  DONE
+}
+
+model Pdca {
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int        // penanggung jawab
+  title        String
+  plan         String     @db.Text // rencana
+  doAction     String?    @db.Text // pelaksanaan
+  checkResult  String?    @db.Text // evaluasi hasil
+  actFollowUp  String?    @db.Text // tindak lanjut
+  status       PdcaStatus @default(PLAN)
+  startDate    DateTime?  @db.Date
+  dueDate      DateTime?  @db.Date
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

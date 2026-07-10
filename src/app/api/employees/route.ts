@@ -48,6 +48,11 @@ const createSchema = z.object({
   departmentId: z.coerce.number().int().positive().optional().nullable(),
   baseSalary: z.coerce.number().min(0).default(0),
   performanceAllowance: z.coerce.number().min(0).default(0),
+  photo: z.string().optional().or(z.literal("")),
+  ktpPhoto: z.string().optional().or(z.literal("")),
+  address: z.string().optional().or(z.literal("")),
+  emergencyName: z.string().optional().or(z.literal("")),
+  emergencyPhone: z.string().optional().or(z.literal("")),
 });
 
 // Registrasi karyawan baru — hanya untuk yang punya authority employees.create (mis. Admin/HR).
@@ -70,6 +75,11 @@ export const POST = handle(async (req: NextRequest) => {
       departmentId: data.departmentId || null,
       baseSalary: data.baseSalary,
       performanceAllowance: data.performanceAllowance,
+      photo: data.photo || null,
+      ktpPhoto: data.ktpPhoto || null,
+      address: data.address || null,
+      emergencyName: data.emergencyName || null,
+      emergencyPhone: data.emergencyPhone || null,
     },
   });
   return ok({ id: user.id }, 201);

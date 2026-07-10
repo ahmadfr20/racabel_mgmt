@@ -25,6 +25,12 @@ const PERMISSIONS: { key: string; label: string; group: string }[] = [
   { key: "roles.manage", label: "Kelola Role & Authority", group: "Pengaturan" },
   { key: "departments.manage", label: "Kelola Department", group: "Pengaturan" },
   { key: "settings.manage", label: "Kelola Jam Kerja & Toleransi", group: "Pengaturan" },
+
+  { key: "tasklog.write", label: "Input Task Log Harian", group: "Task Log" },
+  { key: "tasklog.view_all", label: "Lihat Task Log Semua Karyawan", group: "Task Log" },
+
+  { key: "pdca.view", label: "Lihat PDCA", group: "PDCA" },
+  { key: "pdca.manage", label: "Kelola PDCA", group: "PDCA" },
 ];
 
 // Role bawaan + authority default-nya
@@ -37,6 +43,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "leave.request", "leave.view_all", "leave.approve",
     "payroll.view", "payroll.manage",
     "departments.manage", "settings.manage",
+    "tasklog.write", "tasklog.view_all",
+    "pdca.view", "pdca.manage",
   ],
   CEO: [
     "dashboard.view",
@@ -44,11 +52,15 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "attendance.view_all",
     "leave.view_all",
     "payroll.view",
+    "tasklog.view_all",
+    "pdca.view",
   ],
   Karyawan: [
     "dashboard.view",
     "attendance.checkin",
     "leave.request",
+    "tasklog.write",
+    "pdca.view",
   ],
 };
 

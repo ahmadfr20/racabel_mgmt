@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarClock, CalendarDays, ChevronDown, LayoutDashboard,
-  LogOut, Menu, Moon, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
+  CalendarClock, CalendarDays, ChevronDown, ClipboardList, LayoutDashboard,
+  LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
   Store, Sun, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ const NAV: NavItem[] = [
   { href: "/attendance", label: "Absensi",       icon: CalendarClock,   anyOf: ["attendance.checkin", "attendance.view_all"] },
   { href: "/leave",      label: "Cuti",          icon: CalendarDays,    anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
   { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
+  { href: "/tasklog",    label: "Task Log",      icon: ClipboardList,   anyOf: ["tasklog.write", "tasklog.view_all"] },
+  { href: "/pdca",       label: "PDCA",          icon: RefreshCcw,      anyOf: ["pdca.view", "pdca.manage"] },
   { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
   { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
   { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["dashboard.view"] },

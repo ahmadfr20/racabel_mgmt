@@ -12,7 +12,8 @@ interface PayrollRow {
   baseSalary: number; performanceAllowance: number; score: number;
   performanceAmount: number; totalSalary: number;
 }
-interface Kpi { id: number; name: string; description: string | null; weight: number; active: boolean }
+interface Kpi { id: number; name: string; description: string | null; weight: number; active: boolean; userId: number | null; assignedUserName: string | null }
+interface KpiPerson { id: number; fullName: string }
 
 function periodOptions() {
   const opts: { value: string; label: string }[] = [];
@@ -194,27 +195,54 @@ function ScoreModal({ user, period, onClose, onSaved }: { user: PayrollRow; peri
   );
 }
 
-// ===== Panel kelola KPI & bobot =====
+// ===== Panel kelola KPI & bobot (umum + per orang) =====
 function KpiPanel() {
   const [list, setList] = useState<Kpi[]>([]);
+  const [people, setPeople] = useState<KpiPerson[]>([]);
+  const [scope, setScope] = useState("all"); // "all" | "global" | "<userId>"
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Kpi | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", weight: "0" });
+  const [form, setForm] = useState({ name: "", description: "", weight: "0", userId: "" });
   const [error, setError] = useState("");
 
   async function load() { setList(await apiFetch<Kpi[]>("/api/kpi")); }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    apiFetch<KpiPerson[]>("/api/employees").then(setPeople).catch(() => setPeople([]));
+  }, []);
 
-  const totalWeight = list.filter((k) => k.active).reduce((s, k) => s + k.weight, 0);
+  // KPI yang tampil sesuai scope terpilih.
+  const shown = list.filter((k) => {
+    if (scope === "all") return true;
+    if (scope === "global") return k.userId === null;
+    return String(k.userId) === scope;
+  });
 
-  function openCreate() { setEditing(null); setForm({ name: "", description: "", weight: "0" }); setError(""); setOpen(true); }
-  function openEdit(k: Kpi) { setEditing(k); setForm({ name: k.name, description: k.description ?? "", weight: String(k.weight) }); setError(""); setOpen(true); }
+  // Total bobot yang berlaku untuk scope: jika scope seorang karyawan,
+  // gabungkan KPI umum + KPI khusus dia (keduanya berlaku).
+  const applicable = scope === "all" || scope === "global"
+    ? list.filter((k) => k.active && (scope === "all" || k.userId === null))
+    : list.filter((k) => k.active && (k.userId === null || String(k.userId) === scope));
+  const totalWeight = applicable.reduce((s, k) => s + k.weight, 0);
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ name: "", description: "", weight: "0", userId: scope !== "all" && scope !== "global" ? scope : "" });
+    setError(""); setOpen(true);
+  }
+  function openEdit(k: Kpi) {
+    setEditing(k);
+    setForm({ name: k.name, description: k.description ?? "", weight: String(k.weight), userId: k.userId ? String(k.userId) : "" });
+    setError(""); setOpen(true);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     try {
-      const body = JSON.stringify({ name: form.name, description: form.description, weight: Number(form.weight) });
+      const payload: any = { name: form.name, description: form.description, weight: Number(form.weight) };
+      if (!editing) payload.userId = form.userId ? Number(form.userId) : null;
+      const body = JSON.stringify(payload);
       if (editing) await apiFetch(`/api/kpi/${editing.id}`, { method: "PATCH", body });
       else await apiFetch("/api/kpi", { method: "POST", body });
       setOpen(false);
@@ -232,31 +260,43 @@ function KpiPanel() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div className={cn("badge", totalWeight === 100 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
-          Total bobot aktif: {totalWeight}%{totalWeight !== 100 ? " (idealnya 100%)" : ""}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select className="input !w-auto" value={scope} onChange={(e) => setScope(e.target.value)}>
+            <option value="all">Semua KPI</option>
+            <option value="global">KPI Umum (semua karyawan)</option>
+            {people.map((p) => <option key={p.id} value={p.id}>Khusus: {p.fullName}</option>)}
+          </select>
+          {scope !== "all" && (
+            <div className={cn("badge", totalWeight === 100 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
+              Total bobot berlaku: {totalWeight}%{totalWeight !== 100 ? " (idealnya 100%)" : ""}
+            </div>
+          )}
         </div>
         <button className="btn-primary" onClick={openCreate}><Plus className="h-4 w-4" /> Tambah KPI</button>
       </div>
 
       <div className="grid gap-3">
-        {list.map((k) => (
+        {shown.map((k) => (
           <Card key={k.id} className="!p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-slate-800">{k.name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">{k.name}</p>
+                  <span className={cn("badge", k.userId ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300")}>
+                    {k.assignedUserName ? `Khusus: ${k.assignedUserName}` : "Umum"}
+                  </span>
                   {!k.active && <span className="badge bg-slate-100 text-slate-500">Nonaktif</span>}
                 </div>
-                <p className="truncate text-sm text-slate-500">{k.description || "—"}</p>
+                <p className="truncate text-sm text-slate-500 dark:text-slate-400">{k.description || "—"}</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="text-lg font-bold text-brand-700">{k.weight}%</p>
+                  <p className="text-lg font-bold text-brand-700 dark:text-brand-400">{k.weight}%</p>
                   <p className="text-xs text-slate-400">bobot</p>
                 </div>
-                <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-brand-600" onClick={() => openEdit(k)}><Pencil className="h-4 w-4" /></button>
-                <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" onClick={() => remove(k)}><Trash2 className="h-4 w-4" /></button>
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600" onClick={() => openEdit(k)}><Pencil className="h-4 w-4" /></button>
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600" onClick={() => remove(k)}><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           </Card>
@@ -273,10 +313,25 @@ function KpiPanel() {
             <label className="label">Deskripsi</label>
             <input className="input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </div>
-          <div>
-            <label className="label">Bobot (%)</label>
-            <input type="number" min={0} max={100} className="input" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} required />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Bobot (%)</label>
+              <input type="number" min={0} max={100} className="input" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="label">Berlaku untuk</label>
+              <select
+                className="input"
+                value={form.userId}
+                disabled={!!editing}
+                onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
+              >
+                <option value="">Umum (semua)</option>
+                {people.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
+              </select>
+            </div>
           </div>
+          {editing && <p className="-mt-2 text-xs text-slate-400">Cakupan KPI tidak dapat diubah setelah dibuat.</p>}
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Batal</button>
