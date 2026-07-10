@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { handle, ok } from "@/lib/api";
-import { signSession, sessionCookieName, sessionMaxAge } from "@/lib/session";
+import { signSession, sessionCookieName, sessionMaxAge, cookieSecure } from "@/lib/session";
 
 const schema = z.object({
   username: z.string().min(1, "Username wajib diisi"),
@@ -36,7 +36,7 @@ export const POST = handle(async (req: NextRequest) => {
   res.cookies.set(sessionCookieName, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure,
     path: "/",
     maxAge: sessionMaxAge,
   });

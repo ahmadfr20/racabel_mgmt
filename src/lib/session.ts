@@ -16,6 +16,13 @@ export interface SessionPayload {
 export const sessionCookieName = COOKIE_NAME;
 export const sessionMaxAge = maxAge;
 
+// Flag `secure` cookie. Default mengikuti production, tapi bisa dipaksa lewat
+// COOKIE_SECURE (set "false" saat server masih HTTP / belum pasang SSL).
+export const cookieSecure =
+  process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === "true"
+    : process.env.NODE_ENV === "production";
+
 export async function signSession(payload: SessionPayload): Promise<string> {
   return new SignJWT({ username: payload.username, role: payload.role })
     .setProtectedHeader({ alg: "HS256" })
