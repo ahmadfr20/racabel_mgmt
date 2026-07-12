@@ -87,6 +87,7 @@ model User {
   assignedKpis        KpiMetric[]         @relation("UserKpis")
   taskLogs            TaskLog[]
   pdcas               Pdca[]
+  financialImports    FinancialImport[]
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -280,4 +281,50 @@ model Pdca {
 
   @@index([userId])
   @@index([status])
+}
+
+// ============ Impor Data Keuangan (ekstraksi otomatis via AI dari file Excel/CSV) ============
+
+enum FinancialImportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FinancialTransactionType {
+  INCOME
+  EXPENSE
+}
+
+model FinancialImport {
+  id           Int                    @id @default(autoincrement())
+  fileName     String
+  uploadedBy   User                   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedById Int
+  status       FinancialImportStatus  @default(PROCESSING)
+  currency     String                 @default("IDR")
+  totalIncome  Float                  @default(0)
+  totalExpense Float                  @default(0)
+  aiNotes      String?                @db.Text // catatan ringkas dari AI (ambiguitas, baris yang dilewati, dsb.)
+  errorMessage String?                @db.Text
+  transactions FinancialTransaction[]
+  createdAt    DateTime               @default(now())
+
+  @@index([uploadedById])
+}
+
+model FinancialTransaction {
+  id          Int                       @id @default(autoincrement())
+  import      FinancialImport           @relation(fields: [importId], references: [id], onDelete: Cascade)
+  importId    Int
+  date        DateTime                  @db.Date
+  description String
+  category    String
+  type        FinancialTransactionType
+  amount      Float
+  notes       String?                   @db.Text
+  createdAt   DateTime                  @default(now())
+
+  @@index([importId])
+  @@index([date])
 }

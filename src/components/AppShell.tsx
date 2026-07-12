@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarClock, CalendarDays, ChevronDown, ClipboardList, LayoutDashboard,
+  Bot, CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileSpreadsheet, LayoutDashboard,
   LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
   Store, Sun, Users, Wallet, X,
 } from "lucide-react";
@@ -29,12 +29,14 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/dashboard",  label: "Dashboard",    icon: LayoutDashboard, anyOf: ["dashboard.view"] },
+  { href: "/assistant",  label: "Asisten AI",    icon: Bot,             anyOf: ["assistant.use"] },
   { href: "/attendance", label: "Absensi",       icon: CalendarClock,   anyOf: ["attendance.checkin", "attendance.view_all"] },
   { href: "/leave",      label: "Cuti",          icon: CalendarDays,    anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
   { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
   { href: "/tasklog",    label: "Task Log",      icon: ClipboardList,   anyOf: ["tasklog.write", "tasklog.view_all"] },
   { href: "/pdca",       label: "PDCA",          icon: RefreshCcw,      anyOf: ["pdca.view", "pdca.manage"] },
   { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
+  { href: "/financial",  label: "Keuangan",      icon: FileSpreadsheet, anyOf: ["financial.view", "financial.upload"] },
   { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
   { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["dashboard.view"] },
   { href: "/shopee",     label: "Shopee",        icon: ShoppingCart,    anyOf: ["dashboard.view"] },

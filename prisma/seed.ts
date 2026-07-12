@@ -31,6 +31,11 @@ const PERMISSIONS: { key: string; label: string; group: string }[] = [
 
   { key: "pdca.view", label: "Lihat PDCA", group: "PDCA" },
   { key: "pdca.manage", label: "Kelola PDCA", group: "PDCA" },
+
+  { key: "financial.view", label: "Lihat Data Keuangan", group: "Keuangan" },
+  { key: "financial.upload", label: "Impor File Keuangan (AI)", group: "Keuangan" },
+
+  { key: "assistant.use", label: "Gunakan Asisten AI (Chatbot)", group: "Asisten AI" },
 ];
 
 // Role bawaan + authority default-nya
@@ -45,6 +50,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "departments.manage", "settings.manage",
     "tasklog.write", "tasklog.view_all",
     "pdca.view", "pdca.manage",
+    "financial.view", "financial.upload",
+    "assistant.use",
   ],
   CEO: [
     "dashboard.view",
@@ -54,6 +61,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "payroll.view",
     "tasklog.view_all",
     "pdca.view",
+    "financial.view",
+    "assistant.use",
   ],
   Karyawan: [
     "dashboard.view",
@@ -61,6 +70,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "leave.request",
     "tasklog.write",
     "pdca.view",
+    "assistant.use",
   ],
 };
 

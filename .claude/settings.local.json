@@ -11,7 +11,9 @@
       "Bash(ls src/app/api/)",
       "Bash(ls src/components/)",
       "PowerShell(npm run predev)",
-      "PowerShell(if \\($?\\) { \"predev OK\" })"
+      "PowerShell(if \\($?\\) { \"predev OK\" })",
+      "PowerShell(npm run db:seed)",
+      "PowerShell(npm run build)"
     ]
   }
 }
