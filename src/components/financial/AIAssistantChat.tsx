@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, FileSpreadsheet, GitCompareArrows, Paperclip, Save, Send, User, X } from "lucide-react";
+import { Bot, GitCompareArrows, Paperclip, Send, User, X, FileText, ClipboardList } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui";
@@ -10,30 +10,29 @@ interface DisplayMessage {
   role: "user" | "assistant";
   content: string;
   attachmentName?: string;
-  attachmentImageUrl?: string; // object URL untuk preview gambar (hanya sisi client)
+  attachmentImageUrl?: string;
 }
 
 const SUGGESTIONS = [
-  { icon: Save, text: "Simpan transaksi: pengeluaran listrik Rp1.500.000 hari ini, kategori Utilitas." },
+  { icon: FileText, text: "Buat CPAS Plan afiliasi untuk bulan ini." },
   { icon: GitCompareArrows, text: "Bandingkan total pengeluaran bulan ini dengan bulan lalu, lalu simpan hasilnya." },
-  { icon: FileSpreadsheet, text: "Identifikasi isi file yang saya lampirkan." },
+  { icon: ClipboardList, text: "Tambahkan task PDCA minggu ini." },
+  { icon: FileText, text: "Buat SOP prosedur onboarding affiliate dan simpan sebagai Draft." },
 ];
 
 const ACCEPT = ".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.gif,.webp";
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
-// Chat AI khusus halaman Keuangan: bisa menyimpan transaksi & hasil komparasi
-// ke database, serta membaca lampiran Excel/CSV/PDF sebagai bahan analisis.
-export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload: boolean; onDataChanged: () => void }) {
+export function AIAssistantChat({ canUpload, onDataChanged }: { canUpload: boolean; onDataChanged: () => void }) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [fileError, setFileError] = useState("");
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -83,9 +82,9 @@ export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload
     setMessages(next);
     setInput("");
     const fileToSend = pendingFile;
-    setPendingFile(null);
     if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);
     setPendingImageUrl(null);
+    setPendingFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setSending(true);
 
@@ -118,8 +117,8 @@ export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload
           <Bot className="h-4.5 w-4.5" />
         </div>
         <div>
-          <p className="font-semibold text-slate-800 dark:text-slate-100">Asisten Keuangan AI</p>
-          <p className="text-xs text-slate-400">Perintahkan untuk menyimpan transaksi, membandingkan keuangan, atau membaca file.</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">AI Assistant</p>
+          <p className="text-xs text-slate-400">Kelola keuangan, PDCA, task log, kinerja, serta buat CPAS Plan &amp; SOP afiliasi.</p>
         </div>
       </div>
 
@@ -132,9 +131,7 @@ export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload
       <div className="max-h-[60vh] min-h-[20rem] space-y-3 overflow-y-auto p-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-4 text-center">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Contoh perintah yang bisa Anda coba:
-            </p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Contoh perintah yang bisa Anda coba:</p>
             <div className="flex flex-col gap-2">
               {SUGGESTIONS.map((s, i) => (
                 <button
@@ -209,15 +206,14 @@ export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload
         <div className="mx-5 mb-2 rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
           {pendingImageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={pendingImageUrl}
-              alt={pendingFile.name}
-              className="mb-2 max-h-32 max-w-full rounded-lg object-contain"
-            />
+            <img src={pendingImageUrl} alt={pendingFile.name} className="mb-2 max-h-32 max-w-full rounded-lg object-contain" />
           )}
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5" /> {pendingFile.name}</span>
-            <button onClick={() => { if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl); setPendingImageUrl(null); setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="rounded p-1 hover:bg-slate-200 dark:hover:bg-slate-700">
+            <button
+              onClick={() => { if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl); setPendingImageUrl(null); setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+              className="rounded p-1 hover:bg-slate-200 dark:hover:bg-slate-700"
+            >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -236,7 +232,7 @@ export function FinancialAssistantChat({ canUpload, onDataChanged }: { canUpload
         )}
         <input
           className="input flex-1 !py-2 text-sm"
-          placeholder="Tulis perintah, mis. simpan transaksi atau bandingkan keuangan..."
+          placeholder="Tulis perintah, mis. buat CPAS Plan, input task PDCA, atau bandingkan keuangan..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={sending}
