@@ -240,7 +240,7 @@ export async function sendAssistantChat(messages: ChatMessage[], user: CurrentUs
 
 // ============ Asisten Keuangan AI (chat di halaman Keuangan) ============
 // Bisa menyimpan transaksi & hasil komparasi ke database, dan membaca file
-// Excel/CSV (teks) atau PDF (dikirim langsung sebagai dokumen ke Claude).
+// Excel/CSV (teks), PDF, atau gambar (JPEG/PNG/GIF/WebP) yang dikirim ke Claude.
 
 export interface FinancialAttachment {
   fileName: string;
@@ -260,7 +260,7 @@ Konteks pengguna saat ini:
 Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya akses lihat terbatas)"}.
 
 Pedoman:
-- Bila pengguna melampirkan file (Excel/CSV/PDF), isinya sudah disertakan dalam pesan ini. Baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, jenis pemasukan/pengeluaran, nominal). Jangan mengarang data yang tidak ada di file.
+- Bila pengguna melampirkan file (Excel/CSV/PDF) atau gambar (struk, nota, laporan foto), isinya sudah disertakan dalam pesan ini. Untuk file spreadsheet/PDF, baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, jenis pemasukan/pengeluaran, nominal). Untuk gambar, baca teks yang terlihat (nominal, tanggal, deskripsi) dan ekstrak sebagai transaksi bila relevan. Jangan mengarang data yang tidak ada.
 - Bila pengguna meminta menyimpan transaksi (dari chat maupun dari file yang diunggah), gunakan tool save_transactions. Beri judul riwayat yang jelas (mis. nama file, atau deskripsi ringkas bila input manual).
 - Bila pengguna meminta perbandingan/komparasi (mis. "bandingkan bulan ini vs bulan lalu", atau "bandingkan file yang saya unggah dengan data bulan Juni"), gunakan get_financial_totals dan/atau get_financial_import_detail/list_financial_imports untuk mengumpulkan angka kedua sisi, lalu susun analisis singkat (kenaikan/penurunan, kemungkinan penyebab). Jika pengguna minta hasilnya disimpan, panggil save_financial_comparison dengan angka & analisis tersebut.
 - Nominal selalu angka positif tanpa simbol mata uang. Asumsikan IDR bila mata uang tidak disebutkan.
