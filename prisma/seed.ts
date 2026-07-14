@@ -32,6 +32,10 @@ const PERMISSIONS: { key: string; label: string; group: string }[] = [
   { key: "pdca.view", label: "Lihat PDCA", group: "PDCA" },
   { key: "pdca.manage", label: "Kelola PDCA", group: "PDCA" },
 
+  { key: "tickets.create", label: "Ajukan Tiket", group: "Ticketing" },
+  { key: "tickets.view_all", label: "Lihat Semua Tiket", group: "Ticketing" },
+  { key: "tickets.manage", label: "Kelola Tiket (assign PIC, status, hapus)", group: "Ticketing" },
+
   { key: "financial.view", label: "Lihat Data Keuangan", group: "Keuangan" },
   { key: "financial.upload", label: "Impor File Keuangan (AI)", group: "Keuangan" },
 
@@ -50,6 +54,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "departments.manage", "settings.manage",
     "tasklog.write", "tasklog.view_all",
     "pdca.view", "pdca.manage",
+    "tickets.create", "tickets.view_all", "tickets.manage",
     "financial.view", "financial.upload",
     "assistant.use",
   ],
@@ -61,6 +66,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "payroll.view",
     "tasklog.view_all",
     "pdca.view",
+    "tickets.view_all",
     "financial.view",
     "assistant.use",
   ],
@@ -70,6 +76,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "leave.request",
     "tasklog.write",
     "pdca.view",
+    "tickets.create",
     "assistant.use",
   ],
 };

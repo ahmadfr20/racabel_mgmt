@@ -65,6 +65,11 @@ const BADGE_TONES: Record<string, string> = {
   APPROVED:    "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
   PENDING:     "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
   REJECTED:    "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400",
+  // Ticketing status
+  OPEN:        "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  IN_PROGRESS: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  RESOLVED:    "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+  CLOSED:      "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400",
 };
 
 export function StatusBadge({ status, label }: { status: string; label: string }) {

@@ -1,5 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import type { CurrentUser } from "./auth";
+import { currentPeriod } from "./performance";
+import { toolsForUser } from "./assistantTools";
+import { financialToolsForUser } from "./financialAssistantTools";
 
 // Singleton client — dibuat lazy agar error "API key belum diatur" muncul saat
 // fitur benar-benar dipakai, bukan saat aplikasi start.
@@ -149,33 +153,189 @@ export interface ChatMessage {
   content: string;
 }
 
-const ASSISTANT_SYSTEM_PROMPT = `Anda adalah Asisten AI internal pada aplikasi "Racabel HQ Management" (sistem HR & operasional perusahaan). Anda membantu karyawan seputar tiga hal:
+function buildSystemPrompt(user: CurrentUser, toolNames: string[]): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `Anda adalah Asisten AI internal pada aplikasi "Racabel HQ Management" (sistem HR & operasional perusahaan). Anda TIDAK hanya menjawab — Anda dapat MELAKUKAN aksi di aplikasi melalui tools yang tersedia.
 
-1. Task Log — pencatatan pekerjaan harian (judul, deskripsi, status: Direncanakan/Dikerjakan/Selesai, durasi jam).
-2. PDCA (Plan-Do-Check-Act) — metode manajemen perbaikan berkelanjutan: Plan (rencana), Do (pelaksanaan), Check (evaluasi hasil), Act (tindak lanjut).
-3. Kinerja & Penggajian — skor KPI berbobot per periode dan bagaimana itu memengaruhi tunjangan kinerja & total gaji.
+Konteks pengguna saat ini:
+- Nama: ${user.fullName} (id: ${user.id})
+- Role: ${user.role.name}${user.department ? ` · Department: ${user.department.name}` : ""}
+- Tanggal hari ini: ${today}
+- Periode kinerja berjalan: ${currentPeriod()}
 
-Jawab singkat, jelas, dan praktis dalam Bahasa Indonesia. Anda saat ini BELUM terhubung ke data aplikasi secara langsung (belum bisa membuat, mengubah, atau membaca data spesifik milik pengguna) — jika pengguna meminta Anda melakukan aksi seperti "buatkan task log" atau "ubah status PDCA saya", jelaskan bahwa Anda belum bisa melakukannya secara langsung dan arahkan mereka ke halaman terkait (Task Log, PDCA, atau Kinerja & Gaji) di aplikasi. Anda tetap bisa menjelaskan konsep, memberi contoh, dan membantu menyusun kalimat/rencana yang bisa mereka input sendiri.`;
+Kemampuan Anda (tergantung hak akses pengguna). Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya bisa menjelaskan konsep)"}.
+Secara umum Anda dapat: mencatat Task Log harian, mengelola PDCA (checklist mingguan: buat "Week" dengan periode tanggal, tambahkan task berisi judul + PIC ke dalamnya, dan tandai task selesai/belum), serta mencatat/menghitung kinerja (skor KPI berbobot dan estimasi tunjangan/gaji).
 
-export async function sendAssistantChat(messages: ChatMessage[]): Promise<string> {
+Format PDCA sekarang SEDERHANA (bukan lagi tahapan Plan-Do-Check-Act per item): satu "minggu" (mis. "Week 1", dengan periode tanggal opsional) berisi daftar task, tiap task punya judul, satu PIC (penanggung jawab), dan status Selesai/Belum Selesai. Alur biasa: create_pdca_week dulu (atau pakai list_pdca_weeks untuk minggu yang sudah ada), lalu add_pdca_task untuk tiap task, lalu update_pdca_task_status untuk menandai kemajuan.
+
+Pedoman:
+- Gunakan tools untuk benar-benar membuat/mengubah data ketika pengguna memintanya (mis. "catat task log saya hari ini: ...", "buatkan PDCA Week 1 dengan task ...", "nilai kinerja Budi bulan ini: produktivitas 85, ..."). Jangan hanya menjelaskan cara manualnya jika Anda bisa melakukannya.
+- Untuk menugaskan PIC pada task PDCA atau mencatat kinerja karyawan LAIN, cari id-nya dulu dengan list_employees. Untuk skor kinerja, ambil id metrik dengan list_kpi_metrics terlebih dahulu.
+- Bila informasi kurang (mis. judul task log belum jelas), tanyakan singkat sebelum bertindak. Jangan mengarang nilai.
+- Skor kinerja MEMENGARUHI tunjangan & gaji — untuk perubahan kinerja, tegaskan ringkas apa yang akan/ sudah Anda catat, lalu tampilkan skor berbobot terbaru.
+- Setelah melakukan aksi, konfirmasikan dengan ringkas & spesifik (mis. sebutkan judul, tanggal, atau id yang dibuat).
+- Jika tool mengembalikan error, jelaskan masalahnya ke pengguna dengan bahasa yang mudah.
+- Jawab dalam Bahasa Indonesia, singkat, jelas, dan praktis. Anda bukan pembuat keputusan final — Anda alat bantu.`;
+}
+
+const MAX_TOOL_ITERATIONS = 6;
+
+export async function sendAssistantChat(messages: ChatMessage[], user: CurrentUser): Promise<string> {
   const anthropic = getClient();
+  const { defs, map } = toolsForUser(user);
+  const system = buildSystemPrompt(user, [...map.keys()]);
 
-  const response = await anthropic.messages.create({
-    model: "claude-opus-4-8",
-    max_tokens: 2048,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "low" },
-    system: ASSISTANT_SYSTEM_PROMPT,
-    messages,
+  const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 4096,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      system,
+      tools: defs,
+      messages: convo,
+    });
+
+    if (response.stop_reason === "refusal") {
+      return "Maaf, saya tidak dapat membantu permintaan ini karena kebijakan keamanan.";
+    }
+
+    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+
+    if (toolUses.length === 0) {
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      return text || "Maaf, terjadi kesalahan saat menghasilkan balasan. Coba lagi.";
+    }
+
+    // Simpan giliran asisten (termasuk blok thinking & tool_use) apa adanya.
+    convo.push({ role: "assistant", content: response.content });
+
+    // Jalankan semua tool yang diminta, kembalikan seluruh hasil dalam SATU pesan user.
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      const tool = map.get(tu.name);
+      let res;
+      if (!tool) {
+        res = { content: JSON.stringify({ error: `Tool ${tu.name} tidak tersedia` }), isError: true };
+      } else {
+        try {
+          res = await tool.run(tu.input, user);
+        } catch (e) {
+          res = { content: JSON.stringify({ error: e instanceof Error ? e.message : "Gagal menjalankan aksi" }), isError: true };
+        }
+      }
+      results.push({ type: "tool_result", tool_use_id: tu.id, content: res.content, is_error: res.isError });
+    }
+    convo.push({ role: "user", content: results });
+  }
+
+  return "Maaf, permintaan ini terlalu kompleks untuk saya selesaikan sekarang. Coba pecah menjadi langkah yang lebih kecil.";
+}
+
+// ============ Asisten Keuangan AI (chat di halaman Keuangan) ============
+// Bisa menyimpan transaksi & hasil komparasi ke database, dan membaca file
+// Excel/CSV (teks) atau PDF (dikirim langsung sebagai dokumen ke Claude).
+
+export interface FinancialAttachment {
+  fileName: string;
+  kind: "pdf" | "text";
+  data: string; // base64 untuk pdf, teks polos (CSV) untuk kind "text"
+}
+
+function buildFinancialSystemPrompt(user: CurrentUser, toolNames: string[]): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `Anda adalah Asisten Keuangan AI pada halaman Keuangan aplikasi "Racabel HQ Management". Anda dapat MELAKUKAN aksi nyata (bukan hanya menjawab): membaca file keuangan yang diunggah, menyimpan transaksi ke database, menghitung komparasi keuangan, dan menyimpan hasil komparasi tersebut ke database.
+
+Konteks pengguna saat ini:
+- Nama: ${user.fullName} (id: ${user.id})
+- Tanggal hari ini: ${today}
+
+Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya akses lihat terbatas)"}.
+
+Pedoman:
+- Bila pengguna melampirkan file (Excel/CSV/PDF), isinya sudah disertakan dalam pesan ini. Baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, jenis pemasukan/pengeluaran, nominal). Jangan mengarang data yang tidak ada di file.
+- Bila pengguna meminta menyimpan transaksi (dari chat maupun dari file yang diunggah), gunakan tool save_transactions. Beri judul riwayat yang jelas (mis. nama file, atau deskripsi ringkas bila input manual).
+- Bila pengguna meminta perbandingan/komparasi (mis. "bandingkan bulan ini vs bulan lalu", atau "bandingkan file yang saya unggah dengan data bulan Juni"), gunakan get_financial_totals dan/atau get_financial_import_detail/list_financial_imports untuk mengumpulkan angka kedua sisi, lalu susun analisis singkat (kenaikan/penurunan, kemungkinan penyebab). Jika pengguna minta hasilnya disimpan, panggil save_financial_comparison dengan angka & analisis tersebut.
+- Nominal selalu angka positif tanpa simbol mata uang. Asumsikan IDR bila mata uang tidak disebutkan.
+- Jika informasi kurang jelas (mis. kategori tidak disebutkan), buat asumsi wajar dan sebutkan secara singkat, jangan bertanya berulang-ulang untuk hal kecil.
+- Setelah menyimpan data, konfirmasikan ringkas & spesifik (jumlah transaksi, total pemasukan/pengeluaran, atau id yang dibuat).
+- Jika tool mengembalikan error, jelaskan ke pengguna dengan bahasa yang mudah.
+- Jawab dalam Bahasa Indonesia, singkat, jelas, dan berorientasi aksi.`;
+}
+
+export async function sendFinancialAssistantChat(
+  messages: ChatMessage[],
+  user: CurrentUser,
+  attachment?: FinancialAttachment
+): Promise<string> {
+  const anthropic = getClient();
+  const { defs, map } = financialToolsForUser(user);
+  const system = buildFinancialSystemPrompt(user, [...map.keys()]);
+
+  const lastUserIdx = messages.length - 1;
+  const convo: Anthropic.MessageParam[] = messages.map((m, i) => {
+    if (attachment && i === lastUserIdx && m.role === "user") {
+      const blocks: Anthropic.ContentBlockParam[] =
+        attachment.kind === "pdf"
+          ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: attachment.data } }]
+          : [{ type: "text", text: `Isi file terlampir (${attachment.fileName}):\n\n${attachment.data}` }];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      return { role: "user", content: blocks };
+    }
+    return { role: m.role, content: m.content };
   });
 
-  if (response.stop_reason === "refusal") {
-    return "Maaf, saya tidak dapat membantu permintaan ini karena kebijakan keamanan.";
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 4096,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      system,
+      tools: defs,
+      messages: convo,
+    });
+
+    if (response.stop_reason === "refusal") {
+      return "Maaf, saya tidak dapat membantu permintaan ini karena kebijakan keamanan.";
+    }
+
+    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+
+    if (toolUses.length === 0) {
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      return text || "Maaf, terjadi kesalahan saat menghasilkan balasan. Coba lagi.";
+    }
+
+    convo.push({ role: "assistant", content: response.content });
+
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      const tool = map.get(tu.name);
+      let res;
+      if (!tool) {
+        res = { content: JSON.stringify({ error: `Tool ${tu.name} tidak tersedia` }), isError: true };
+      } else {
+        try {
+          res = await tool.run(tu.input, user);
+        } catch (e) {
+          res = { content: JSON.stringify({ error: e instanceof Error ? e.message : "Gagal menjalankan aksi" }), isError: true };
+        }
+      }
+      results.push({ type: "tool_result", tool_use_id: tu.id, content: res.content, is_error: res.isError });
+    }
+    convo.push({ role: "user", content: results });
   }
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return "Maaf, terjadi kesalahan saat menghasilkan balasan. Coba lagi.";
-  }
-  return textBlock.text;
+  return "Maaf, permintaan ini terlalu kompleks untuk saya selesaikan sekarang. Coba pecah menjadi langkah yang lebih kecil.";
 }

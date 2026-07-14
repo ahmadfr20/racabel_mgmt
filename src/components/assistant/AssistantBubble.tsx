@@ -11,9 +11,9 @@ interface ChatMessage {
 }
 
 const SUGGESTIONS = [
-  { icon: ClipboardList, text: "Bagaimana cara mencatat Task Log harian?" },
-  { icon: RefreshCcw, text: "Jelaskan tahapan PDCA (Plan-Do-Check-Act)." },
-  { icon: Gauge, text: "Bagaimana skor kinerja saya dihitung?" },
+  { icon: ClipboardList, text: "Catat task log hari ini: menyiapkan laporan mingguan, status selesai, 2 jam." },
+  { icon: RefreshCcw, text: "Buatkan PDCA Week 1 (1-5 Juli) dengan task: analisa winning content." },
+  { icon: Gauge, text: "Hitung skor kinerja saya periode ini." },
 ];
 
 // Chatbot yang diakses lewat bubble mengambang di pojok layar (tersedia di semua halaman),

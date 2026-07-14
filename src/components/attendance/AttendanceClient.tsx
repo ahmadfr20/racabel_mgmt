@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Clock, LogIn, LogOut, CheckCircle2, Image as ImageIcon, Loader2 } from "lucide-react";
+import { CalendarClock, Clock, LogIn, LogOut, CheckCircle2, ImageOff, Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatTime, formatDate, minutesToLabel, STATUS_LABEL, cn } from "@/lib/utils";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
@@ -31,7 +31,7 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
   const [scope, setScope] = useState<"mine" | "all">(canViewAll && !canCheckin ? "all" : "mine");
   const [date, setDate] = useState("");
   const [records, setRecords] = useState<Record[]>([]);
-  const [photo, setPhoto] = useState<{ title: string; url: string | null } | null>(null);
+  const [photo, setPhoto] = useState<{ title: string; url: string } | null>(null);
 
   const loadToday = useCallback(async () => {
     if (!canCheckin) return;
@@ -66,20 +66,8 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
     }
   }
 
-  async function viewPhoto(id: number, type: "in" | "out", title: string) {
-    setPhoto({ title, url: null }); // status memuat
-    try {
-      const res = await apiFetch<{ photo: string | null }>(`/api/attendance/${id}/photo?type=${type}`);
-      if (!res.photo) {
-        alert("Foto tidak tersedia untuk absensi ini.");
-        setPhoto(null);
-        return;
-      }
-      setPhoto({ title, url: res.photo });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Gagal memuat foto");
-      setPhoto(null);
-    }
+  function openPhoto(title: string, url: string) {
+    setPhoto({ title, url });
   }
 
   const att = today?.attendance;
@@ -178,7 +166,7 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
                   <th className="px-5 py-3 font-medium">Masuk</th>
                   <th className="px-5 py-3 font-medium">Pulang</th>
                   <th className="px-5 py-3 font-medium">Durasi</th>
-                  {canViewAll && <th className="px-5 py-3 font-medium">Foto</th>}
+                  <th className="px-5 py-3 font-medium">Foto</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -204,19 +192,20 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
                       </div>
                     </td>
                     <td className="px-5 py-3 text-slate-600">{r.workedMinutes ? minutesToLabel(r.workedMinutes) : "-"}</td>
-                    {canViewAll && (
-                      <td className="px-5 py-3">
-                        <div className="flex gap-1.5">
-                          {r.checkInAt && (
-                            <PhotoButton label="Masuk" onClick={() => viewPhoto(r.id, "in", `Foto Check-in — ${r.user.fullName}`)} />
-                          )}
-                          {r.checkOutAt && (
-                            <PhotoButton label="Pulang" onClick={() => viewPhoto(r.id, "out", `Foto Check-out — ${r.user.fullName}`)} />
-                          )}
-                          {!r.checkInAt && !r.checkOutAt && <span className="text-xs text-slate-300">—</span>}
-                        </div>
-                      </td>
-                    )}
+                    <td className="px-5 py-3">
+                      <div className="flex gap-2">
+                        {r.checkInAt ? (
+                          <PhotoThumb id={r.id} type="in" label="Masuk" personName={r.user.fullName} onOpen={openPhoto} />
+                        ) : (
+                          <EmptyThumb label="Masuk" />
+                        )}
+                        {r.checkOutAt ? (
+                          <PhotoThumb id={r.id} type="out" label="Pulang" personName={r.user.fullName} onOpen={openPhoto} />
+                        ) : (
+                          <EmptyThumb label="Pulang" />
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -235,30 +224,67 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
         )}
       </Modal>
 
-      {/* Lightbox foto absensi */}
+      {/* Lightbox foto absensi (ukuran penuh) */}
       <Modal open={photo !== null} onClose={() => setPhoto(null)} title={photo?.title ?? "Foto Absensi"}>
-        {photo?.url === null ? (
-          <div className="grid h-64 place-items-center text-slate-400">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : (
+        {photo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo?.url ?? ""} alt="Foto absensi" className="w-full rounded-xl" />
+          <img src={photo.url} alt="Foto absensi" className="w-full rounded-xl" />
         )}
       </Modal>
     </div>
   );
 }
 
-function PhotoButton({ label, onClick }: { label: string; onClick: () => void }) {
+// Thumbnail foto yang otomatis dimuat begitu baris tampil — tanpa perlu klik
+// tombol terlebih dahulu. Klik thumbnail untuk melihat ukuran penuh.
+function PhotoThumb({
+  id, type, label, personName, onOpen,
+}: {
+  id: number; type: "in" | "out"; label: string; personName: string; onOpen: (title: string, url: string) => void;
+}) {
+  const [state, setState] = useState<"loading" | "empty" | { url: string }>("loading");
+
+  useEffect(() => {
+    let active = true;
+    apiFetch<{ photo: string | null }>(`/api/attendance/${id}/photo?type=${type}`)
+      .then((res) => { if (active) setState(res.photo ? { url: res.photo } : "empty"); })
+      .catch(() => { if (active) setState("empty"); });
+    return () => { active = false; };
+  }, [id, type]);
+
   return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-      title={`Lihat foto ${label.toLowerCase()}`}
-    >
-      <ImageIcon className="h-3.5 w-3.5" /> {label}
-    </button>
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      {state === "loading" ? (
+        <div className="grid h-11 w-11 place-items-center rounded-lg bg-slate-100">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />
+        </div>
+      ) : state === "empty" ? (
+        <div className="grid h-11 w-11 place-items-center rounded-lg bg-slate-100 text-slate-300" title={`Tidak ada foto ${label.toLowerCase()}`}>
+          <ImageOff className="h-4 w-4" />
+        </div>
+      ) : (
+        <button
+          onClick={() => onOpen(`Foto ${label} — ${personName}`, state.url)}
+          className="h-11 w-11 overflow-hidden rounded-lg border border-slate-200 transition hover:ring-2 hover:ring-brand-400"
+          title={`Lihat foto ${label.toLowerCase()} (ukuran penuh)`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={state.url} alt={`Foto ${label.toLowerCase()}`} className="h-full w-full object-cover" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyThumb({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      <div className="grid h-11 w-11 place-items-center rounded-lg bg-slate-50 text-slate-200">
+        <ImageOff className="h-4 w-4" />
+      </div>
+    </div>
   );
 }
 

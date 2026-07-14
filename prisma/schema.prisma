@@ -45,66 +45,70 @@ model RolePermission {
 // ============ Department (bisa ditambahkan) ============
 
 model Department {
-  id          Int            @id @default(autoincrement())
-  name        String         @unique
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
   description String?
   users       User[]
   schedule    WorkSchedule?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 // ============ User / Karyawan ============
 
 model User {
-  id                  Int      @id @default(autoincrement())
-  username            String   @unique
-  email               String?  @unique
-  passwordHash        String
-  fullName            String
-  birthDate           DateTime?
-  joinDate            DateTime @default(now())
-  photo               String?  @db.LongText // data URL foto profil (opsional)
-  ktpPhoto            String?  @db.LongText // data URL foto KTP (opsional)
-  address             String?  @db.Text     // alamat lengkap
-  emergencyName       String?               // nama pemilik kontak darurat
-  emergencyPhone      String?               // nomor telepon kontak darurat
-  isActive            Boolean  @default(true)
+  id             Int       @id @default(autoincrement())
+  username       String    @unique
+  email          String?   @unique
+  passwordHash   String
+  fullName       String
+  birthDate      DateTime?
+  joinDate       DateTime  @default(now())
+  photo          String?   @db.LongText // data URL foto profil (opsional)
+  ktpPhoto       String?   @db.LongText // data URL foto KTP (opsional)
+  address        String?   @db.Text // alamat lengkap
+  emergencyName  String? // nama pemilik kontak darurat
+  emergencyPhone String? // nomor telepon kontak darurat
+  isActive       Boolean   @default(true)
 
-  roleId              Int
-  role                Role       @relation(fields: [roleId], references: [id])
-  departmentId        Int?
-  department          Department? @relation(fields: [departmentId], references: [id])
+  roleId       Int
+  role         Role        @relation(fields: [roleId], references: [id])
+  departmentId Int?
+  department   Department? @relation(fields: [departmentId], references: [id])
 
-  baseSalary          Float    @default(0)   // gaji pokok
-  performanceAllowance Float   @default(0)   // tunjangan kinerja maksimal (dikali skor)
+  baseSalary           Float @default(0) // gaji pokok
+  performanceAllowance Float @default(0) // tunjangan kinerja maksimal (dikali skor)
 
-  attendances         Attendance[]
-  leaveRequests       LeaveRequest[]      @relation("Requester")
-  reviewedLeaves      LeaveRequest[]      @relation("Reviewer")
-  performanceRecords  PerformanceRecord[]
-  payrolls            Payroll[]
-  assignedKpis        KpiMetric[]         @relation("UserKpis")
-  taskLogs            TaskLog[]
-  pdcas               Pdca[]
-  financialImports    FinancialImport[]
+  attendances          Attendance[]
+  leaveRequests        LeaveRequest[]        @relation("Requester")
+  reviewedLeaves       LeaveRequest[]        @relation("Reviewer")
+  performanceRecords   PerformanceRecord[]
+  payrolls             Payroll[]
+  assignedKpis         KpiMetric[]           @relation("UserKpis")
+  taskLogs             TaskLog[]
+  pdcaTasks            PdcaTask[]
+  financialImports     FinancialImport[]
+  financialComparisons FinancialComparison[]
+  ticketsRequested     Ticket[]              @relation("TicketRequester")
+  ticketsAssigned      Ticket[]              @relation("TicketAssignee")
+  ticketComments       TicketComment[]       @relation("TicketCommentAuthor")
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============ Jam kerja & toleransi (per department, null = default global) ============
 
 model WorkSchedule {
-  id                 Int         @id @default(autoincrement())
-  departmentId       Int?        @unique // null = pengaturan default global
-  department         Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  checkInTime        String      @default("08:00") // HH:mm
-  checkOutTime       String      @default("17:00") // HH:mm
-  lateToleranceMin   Int         @default(15)      // toleransi terlambat (menit)
-  earlyLeaveTolMin   Int         @default(0)       // toleransi pulang cepat (menit)
-  workDays           String      @default("1,2,3,4,5") // 0=Min ... 6=Sab
-  updatedAt          DateTime    @updatedAt
+  id               Int         @id @default(autoincrement())
+  departmentId     Int?        @unique // null = pengaturan default global
+  department       Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  checkInTime      String      @default("08:00") // HH:mm
+  checkOutTime     String      @default("17:00") // HH:mm
+  lateToleranceMin Int         @default(15) // toleransi terlambat (menit)
+  earlyLeaveTolMin Int         @default(0) // toleransi pulang cepat (menit)
+  workDays         String      @default("1,2,3,4,5") // 0=Min ... 6=Sab
+  updatedAt        DateTime    @updatedAt
 }
 
 // ============ Absensi ============
@@ -176,17 +180,17 @@ model LeaveRequest {
 // ============ Kinerja & Penggajian (pembobotan) ============
 
 model KpiMetric {
-  id          Int                 @id @default(autoincrement())
-  name        String
-  description String?
-  weight      Float               @default(0) // bobot (%) — total semua metric idealnya 100
-  active      Boolean             @default(true)
+  id           Int                 @id @default(autoincrement())
+  name         String
+  description  String?
+  weight       Float               @default(0) // bobot (%) — total semua metric idealnya 100
+  active       Boolean             @default(true)
   // Jika userId null = KPI umum (berlaku untuk semua karyawan).
   // Jika terisi = KPI khusus milik karyawan tersebut.
   userId       Int?
-  assignedUser User?              @relation("UserKpis", fields: [userId], references: [id], onDelete: Cascade)
-  records     PerformanceRecord[]
-  createdAt   DateTime            @default(now())
+  assignedUser User?               @relation("UserKpis", fields: [userId], references: [id], onDelete: Cascade)
+  records      PerformanceRecord[]
+  createdAt    DateTime            @default(now())
 
   @@index([userId])
 }
@@ -207,17 +211,17 @@ model PerformanceRecord {
 }
 
 model Payroll {
-  id                 Int      @id @default(autoincrement())
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId             Int
-  period             String // YYYY-MM
-  baseSalary         Float
-  performanceScore   Float // skor berbobot 0-100
-  performanceAmount  Float // tunjangan kinerja yang didapat
-  deductions         Float    @default(0)
-  totalSalary        Float
-  note               String?  @db.Text
-  generatedAt        DateTime @default(now())
+  id                Int      @id @default(autoincrement())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            Int
+  period            String // YYYY-MM
+  baseSalary        Float
+  performanceScore  Float // skor berbobot 0-100
+  performanceAmount Float // tunjangan kinerja yang didapat
+  deductions        Float    @default(0)
+  totalSalary       Float
+  note              String?  @db.Text
+  generatedAt       DateTime @default(now())
 
   @@unique([userId, period])
 }
@@ -233,9 +237,9 @@ model AppConfig {
 // ============ Task Log Harian ============
 
 enum TaskStatus {
-  PLANNED     // Direncanakan
+  PLANNED // Direncanakan
   IN_PROGRESS // Dikerjakan
-  DONE        // Selesai
+  DONE // Selesai
 }
 
 model TaskLog {
@@ -246,7 +250,7 @@ model TaskLog {
   title       String
   description String?    @db.Text
   status      TaskStatus @default(DONE)
-  hours       Float?     // durasi jam (opsional)
+  hours       Float? // durasi jam (opsional)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -254,33 +258,39 @@ model TaskLog {
   @@index([date])
 }
 
-// ============ Manajemen PDCA (Plan-Do-Check-Act) ============
+// ============ Manajemen PDCA: checklist mingguan (Week -> Task per PIC) ============
 
-enum PdcaStatus {
-  PLAN
-  DO
-  CHECK
-  ACT
-  DONE
+enum PdcaTaskStatus {
+  BELUM_SELESAI
+  SELESAI
 }
 
-model Pdca {
-  id           Int        @id @default(autoincrement())
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       Int        // penanggung jawab
-  title        String
-  plan         String     @db.Text // rencana
-  doAction     String?    @db.Text // pelaksanaan
-  checkResult  String?    @db.Text // evaluasi hasil
-  actFollowUp  String?    @db.Text // tindak lanjut
-  status       PdcaStatus @default(PLAN)
-  startDate    DateTime?  @db.Date
-  dueDate      DateTime?  @db.Date
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+model PdcaWeek {
+  id        Int        @id @default(autoincrement())
+  title     String // mis. "Week 1"
+  startDate DateTime?  @db.Date
+  endDate   DateTime?  @db.Date
+  tasks     PdcaTask[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
+  @@index([startDate])
+}
+
+model PdcaTask {
+  id        Int            @id @default(autoincrement())
+  week      PdcaWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  weekId    Int
+  title     String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade) // PIC
+  userId    Int
+  status    PdcaTaskStatus @default(BELUM_SELESAI)
+  order     Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([weekId])
   @@index([userId])
-  @@index([status])
 }
 
 // ============ Impor Data Keuangan (ekstraksi otomatis via AI dari file Excel/CSV) ============
@@ -314,17 +324,92 @@ model FinancialImport {
 }
 
 model FinancialTransaction {
-  id          Int                       @id @default(autoincrement())
-  import      FinancialImport           @relation(fields: [importId], references: [id], onDelete: Cascade)
+  id          Int                      @id @default(autoincrement())
+  import      FinancialImport          @relation(fields: [importId], references: [id], onDelete: Cascade)
   importId    Int
-  date        DateTime                  @db.Date
+  date        DateTime                 @db.Date
   description String
   category    String
   type        FinancialTransactionType
   amount      Float
-  notes       String?                   @db.Text
-  createdAt   DateTime                  @default(now())
+  notes       String?                  @db.Text
+  createdAt   DateTime                 @default(now())
 
   @@index([importId])
   @@index([date])
+}
+
+// Hasil komparasi keuangan (dibuat oleh Asisten AI Keuangan lewat chat) antara
+// dua ruang lingkup — mis. dua periode, atau dua data impor — beserta insight-nya.
+model FinancialComparison {
+  id            Int      @id @default(autoincrement())
+  title         String
+  scopeALabel   String // deskripsi ruang lingkup A, mis. "Juni 2026" atau "Impor #3"
+  scopeBLabel   String
+  totalIncomeA  Float    @default(0)
+  totalExpenseA Float    @default(0)
+  totalIncomeB  Float    @default(0)
+  totalExpenseB Float    @default(0)
+  analysis      String   @db.Text // ringkasan/insight komparasi dari AI
+  createdBy     User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById   Int
+  createdAt     DateTime @default(now())
+
+  @@index([createdById])
+}
+
+// ============ Ticketing System (helpdesk internal) ============
+
+enum TicketStatus {
+  OPEN // Baru dibuka, belum ditangani
+  IN_PROGRESS // Sedang dikerjakan PIC
+  RESOLVED // Sudah diselesaikan PIC
+  CLOSED // Ditutup (dikonfirmasi pengaju / final)
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String         @db.Text
+  category    String         @default("Umum")
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+
+  // Siapa yang mengajukan tiket
+  requester   User  @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterId Int
+  // PIC yang ditugaskan menyelesaikan (opsional saat dibuat)
+  assignee    User? @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  assigneeId  Int?
+
+  dueDate        DateTime? @db.Date
+  resolvedAt     DateTime?
+  resolutionNote String?   @db.Text
+
+  comments  TicketComment[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([status])
+  @@index([assigneeId])
+  @@index([requesterId])
+}
+
+model TicketComment {
+  id        Int      @id @default(autoincrement())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  author    User     @relation("TicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  Int
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
 }

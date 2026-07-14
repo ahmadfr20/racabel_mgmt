@@ -1,224 +1,313 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { CalendarRange, Check, Circle, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatDate, cn } from "@/lib/utils";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { Modal } from "@/components/Modal";
 
-interface Pdca {
+interface PdcaTaskItem {
   id: number;
+  title: string;
+  status: "BELUM_SELESAI" | "SELESAI";
   userId: number;
   userName: string;
+}
+interface PdcaWeekItem {
+  id: number;
   title: string;
-  plan: string;
-  doAction: string | null;
-  checkResult: string | null;
-  actFollowUp: string | null;
-  status: "PLAN" | "DO" | "CHECK" | "ACT" | "DONE";
   startDate: string | null;
-  dueDate: string | null;
+  endDate: string | null;
+  tasks: PdcaTaskItem[];
 }
 interface Person { id: number; fullName: string }
 
-const STATUS: Record<string, { label: string; cls: string }> = {
-  PLAN:  { label: "Plan",    cls: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
-  DO:    { label: "Do",      cls: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" },
-  CHECK: { label: "Check",   cls: "bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400" },
-  ACT:   { label: "Act",     cls: "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" },
-  DONE:  { label: "Selesai", cls: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" },
-};
+const WEEK_EMPTY = { title: "", startDate: "", endDate: "" };
+const TASK_EMPTY = { title: "", userId: "", status: "BELUM_SELESAI" as "BELUM_SELESAI" | "SELESAI" };
 
-const EMPTY = {
-  title: "", plan: "", doAction: "", checkResult: "", actFollowUp: "",
-  status: "PLAN", startDate: "", dueDate: "", userId: "",
-};
-
-export function PdcaClient({ canManage }: { canManage: boolean }) {
-  const [list, setList] = useState<Pdca[]>([]);
-  const [people, setPeople] = useState<Person[]>([]);
+export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; currentUserId: number }) {
+  const [weeks, setWeeks] = useState<PdcaWeekItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Pdca | null>(null);
-  const [form, setForm] = useState<any>(EMPTY);
+  const [people, setPeople] = useState<Person[]>([]);
+
+  const [weekModalOpen, setWeekModalOpen] = useState(false);
+  const [editingWeek, setEditingWeek] = useState<PdcaWeekItem | null>(null);
+  const [weekForm, setWeekForm] = useState(WEEK_EMPTY);
+
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [activeWeekId, setActiveWeekId] = useState<number | null>(null);
+  const [editingTask, setEditingTask] = useState<PdcaTaskItem | null>(null);
+  const [taskForm, setTaskForm] = useState(TASK_EMPTY);
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function load() {
     setLoading(true);
-    setList(await apiFetch<Pdca[]>("/api/pdca"));
-    setLoading(false);
+    try {
+      setWeeks(await apiFetch<PdcaWeekItem[]>("/api/pdca/weeks"));
+    } finally {
+      setLoading(false);
+    }
   }
+
   useEffect(() => {
     load();
-    if (canManage) {
-      apiFetch<Person[]>("/api/employees").then(setPeople).catch(() => setPeople([]));
-    }
+    if (canManage) apiFetch<Person[]>("/api/employees").then(setPeople).catch(() => setPeople([]));
   }, [canManage]);
 
-  function openCreate() { setEditing(null); setForm(EMPTY); setError(""); setOpen(true); }
-  function openEdit(p: Pdca) {
-    setEditing(p);
-    setForm({
-      title: p.title, plan: p.plan, doAction: p.doAction ?? "", checkResult: p.checkResult ?? "",
-      actFollowUp: p.actFollowUp ?? "", status: p.status,
-      startDate: p.startDate ? p.startDate.slice(0, 10) : "", dueDate: p.dueDate ? p.dueDate.slice(0, 10) : "",
-      userId: String(p.userId),
-    });
-    setError(""); setOpen(true);
+  // ===== Minggu PDCA =====
+  function openCreateWeek() {
+    setEditingWeek(null);
+    setWeekForm(WEEK_EMPTY);
+    setError("");
+    setWeekModalOpen(true);
   }
-
-  async function submit(ev: React.FormEvent) {
-    ev.preventDefault();
+  function openEditWeek(w: PdcaWeekItem) {
+    setEditingWeek(w);
+    setWeekForm({ title: w.title, startDate: w.startDate?.slice(0, 10) ?? "", endDate: w.endDate?.slice(0, 10) ?? "" });
+    setError("");
+    setWeekModalOpen(true);
+  }
+  async function submitWeek(e: React.FormEvent) {
+    e.preventDefault();
     setError(""); setSaving(true);
     try {
-      const payload = {
-        title: form.title, plan: form.plan, doAction: form.doAction, checkResult: form.checkResult,
-        actFollowUp: form.actFollowUp, status: form.status, startDate: form.startDate, dueDate: form.dueDate,
-        userId: form.userId ? Number(form.userId) : null,
-      };
-      if (editing) await apiFetch(`/api/pdca/${editing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-      else await apiFetch("/api/pdca", { method: "POST", body: JSON.stringify(payload) });
-      setOpen(false);
+      const payload = { title: weekForm.title, startDate: weekForm.startDate || null, endDate: weekForm.endDate || null };
+      if (editingWeek) await apiFetch(`/api/pdca/weeks/${editingWeek.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+      else await apiFetch("/api/pdca/weeks", { method: "POST", body: JSON.stringify(payload) });
+      setWeekModalOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan");
-    } finally { setSaving(false); }
+      setError(err instanceof Error ? err.message : "Gagal menyimpan minggu");
+    } finally {
+      setSaving(false);
+    }
   }
-
-  async function remove(p: Pdca) {
-    if (!confirm(`Hapus PDCA "${p.title}"?`)) return;
-    await apiFetch(`/api/pdca/${p.id}`, { method: "DELETE" });
+  async function removeWeek(w: PdcaWeekItem) {
+    if (!confirm(`Hapus "${w.title}" beserta seluruh task di dalamnya?`)) return;
+    await apiFetch(`/api/pdca/weeks/${w.id}`, { method: "DELETE" });
     await load();
   }
 
-  const set = (k: string) => (ev: any) => setForm((f: any) => ({ ...f, [k]: ev.target.value }));
+  // ===== Task PDCA =====
+  function openCreateTask(weekId: number) {
+    setActiveWeekId(weekId);
+    setEditingTask(null);
+    setTaskForm({ ...TASK_EMPTY, userId: String(currentUserId) });
+    setError("");
+    setTaskModalOpen(true);
+  }
+  function openEditTask(weekId: number, t: PdcaTaskItem) {
+    setActiveWeekId(weekId);
+    setEditingTask(t);
+    setTaskForm({ title: t.title, userId: String(t.userId), status: t.status });
+    setError("");
+    setTaskModalOpen(true);
+  }
+  async function submitTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeWeekId) return;
+    setError(""); setSaving(true);
+    try {
+      const payload = {
+        weekId: activeWeekId,
+        title: taskForm.title,
+        userId: taskForm.userId ? Number(taskForm.userId) : currentUserId,
+        status: taskForm.status,
+      };
+      if (editingTask) await apiFetch(`/api/pdca/tasks/${editingTask.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+      else await apiFetch("/api/pdca/tasks", { method: "POST", body: JSON.stringify(payload) });
+      setTaskModalOpen(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan task");
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function removeTask(t: PdcaTaskItem) {
+    if (!confirm(`Hapus task "${t.title}"?`)) return;
+    await apiFetch(`/api/pdca/tasks/${t.id}`, { method: "DELETE" });
+    await load();
+  }
+  async function toggleStatus(t: PdcaTaskItem) {
+    const next = t.status === "SELESAI" ? "BELUM_SELESAI" : "SELESAI";
+    // Optimistic update agar terasa responsif.
+    setWeeks((cur) => cur.map((w) => ({ ...w, tasks: w.tasks.map((x) => (x.id === t.id ? { ...x, status: next } : x)) })));
+    try {
+      await apiFetch(`/api/pdca/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ status: next }) });
+    } catch (err) {
+      await load();
+      alert(err instanceof Error ? err.message : "Gagal mengubah status");
+    }
+  }
+
+  function periodLabel(w: PdcaWeekItem) {
+    if (w.startDate && w.endDate) return `${formatDate(w.startDate)} – ${formatDate(w.endDate)}`;
+    if (w.startDate) return `Mulai ${formatDate(w.startDate)}`;
+    if (w.endDate) return `Sampai ${formatDate(w.endDate)}`;
+    return "Periode belum diatur";
+  }
 
   return (
     <div>
       <PageHeader
         title="Manajemen PDCA"
-        subtitle="Siklus perbaikan berkelanjutan: Plan → Do → Check → Act."
+        subtitle="Checklist mingguan: daftar task, PIC, dan status penyelesaian."
         action={canManage && (
-          <button className="btn-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Tambah PDCA
+          <button className="btn-primary" onClick={openCreateWeek}>
+            <Plus className="h-4 w-4" /> Tambah Minggu
           </button>
         )}
       />
 
       {loading ? (
         <div className="py-16 text-center text-sm text-slate-400">Memuat data...</div>
-      ) : list.length === 0 ? (
-        <EmptyState title="Belum ada siklus PDCA" subtitle="Buat siklus perbaikan pertama Anda." icon={<RefreshCcw className="h-10 w-10" />} />
+      ) : weeks.length === 0 ? (
+        <EmptyState title="Belum ada minggu PDCA" subtitle="Buat minggu pertama untuk mulai mencatat task." icon={<CalendarRange className="h-10 w-10" />} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {list.map((p) => (
-            <div key={p.id} className="card p-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-slate-800 dark:text-slate-100">{p.title}</h3>
-                    <span className={cn("badge", STATUS[p.status].cls)}>{STATUS[p.status].label}</span>
+        <div className="grid gap-4">
+          {weeks.map((w) => {
+            const done = w.tasks.filter((t) => t.status === "SELESAI").length;
+            const total = w.tasks.length;
+            return (
+              <Card key={w.id} className="!p-0 overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
+                      {total > 0 && (
+                        <span className={cn(
+                          "badge",
+                          done === total ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                        )}>
+                          {done}/{total} selesai
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarRange className="h-3.5 w-3.5" /> {periodLabel(w)}
+                    </p>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    PIC: {p.userName}
-                    {p.dueDate && ` · Target: ${formatDate(p.dueDate)}`}
-                  </p>
+                  {canManage && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button onClick={() => openCreateTask(w.id)} className="btn-ghost !py-1.5 !px-3 text-xs">
+                        <Plus className="h-3.5 w-3.5" /> Tugas
+                      </button>
+                      <button onClick={() => openEditWeek(w)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => removeWeek(w)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  )}
                 </div>
-                {canManage && (
-                  <div className="flex shrink-0 gap-1">
-                    <button onClick={() => openEdit(p)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => remove(p)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+
+                {w.tasks.length === 0 ? (
+                  <p className="px-5 py-6 text-center text-sm text-slate-400">Belum ada task di minggu ini.</p>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {w.tasks.map((t) => {
+                      const canToggle = canManage || t.userId === currentUserId;
+                      const isDone = t.status === "SELESAI";
+                      return (
+                        <div key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <button
+                              onClick={() => canToggle && toggleStatus(t)}
+                              disabled={!canToggle}
+                              className={cn(
+                                "grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors",
+                                isDone
+                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                  : "border-slate-300 dark:border-slate-600 text-transparent",
+                                canToggle ? "cursor-pointer hover:border-brand-400" : "cursor-not-allowed opacity-60"
+                              )}
+                              title={canToggle ? (isDone ? "Tandai belum selesai" : "Tandai selesai") : "Hanya PIC atau pengelola yang dapat mengubah status"}
+                            >
+                              {isDone ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-2 w-2 fill-current" />}
+                            </button>
+                            <div className="min-w-0">
+                              <p className={cn("truncate text-sm font-medium", isDone ? "text-slate-400 line-through" : "text-slate-800 dark:text-slate-100")}>
+                                {t.title}
+                              </p>
+                              <p className="text-xs text-slate-400">PIC: {t.userName}</p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className={cn("badge", isDone ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400")}>
+                              {isDone ? "Selesai" : "Belum"}
+                            </span>
+                            {canManage && (
+                              <>
+                                <button onClick={() => openEditTask(w.id, t)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600"><Pencil className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => removeTask(t)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Quadrant color="blue"   label="Plan"  text={p.plan} />
-                <Quadrant color="amber"  label="Do"    text={p.doAction} />
-                <Quadrant color="violet" label="Check" text={p.checkResult} />
-                <Quadrant color="orange" label="Act"   text={p.actFollowUp} />
-              </div>
-            </div>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {open && (
-        <Modal open onClose={() => setOpen(false)} title={editing ? "Ubah PDCA" : "Tambah PDCA"} size="lg">
-          <form onSubmit={submit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="label">Judul / Tema *</label>
-                <input className="input" value={form.title} onChange={set("title")} required placeholder="mis. Mengurangi keterlambatan pengiriman" />
-              </div>
-              {people.length > 0 && (
-                <div>
-                  <label className="label">Penanggung Jawab (PIC)</label>
-                  <select className="input" value={form.userId} onChange={set("userId")}>
-                    <option value="">— Saya sendiri —</option>
-                    {people.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="label">Status</label>
-                <select className="input" value={form.status} onChange={set("status")}>
-                  <option value="PLAN">Plan</option>
-                  <option value="DO">Do</option>
-                  <option value="CHECK">Check</option>
-                  <option value="ACT">Act</option>
-                  <option value="DONE">Selesai</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Tanggal Mulai</label>
-                <input className="input" type="date" value={form.startDate} onChange={set("startDate")} />
-              </div>
-              <div>
-                <label className="label">Target Selesai</label>
-                <input className="input" type="date" value={form.dueDate} onChange={set("dueDate")} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">Plan (Rencana) *</label>
-                <textarea className="input min-h-[70px]" value={form.plan} onChange={set("plan")} required placeholder="Apa masalah/target & rencana tindakan?" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">Do (Pelaksanaan)</label>
-                <textarea className="input min-h-[70px]" value={form.doAction} onChange={set("doAction")} placeholder="Apa yang dikerjakan?" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">Check (Evaluasi)</label>
-                <textarea className="input min-h-[70px]" value={form.checkResult} onChange={set("checkResult")} placeholder="Hasil vs target, apa temuannya?" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="label">Act (Tindak Lanjut)</label>
-                <textarea className="input min-h-[70px]" value={form.actFollowUp} onChange={set("actFollowUp")} placeholder="Standarisasi / perbaikan lanjutan?" />
-              </div>
+      {/* Modal minggu */}
+      <Modal open={weekModalOpen} onClose={() => setWeekModalOpen(false)} title={editingWeek ? "Ubah Minggu PDCA" : "Tambah Minggu PDCA"}>
+        <form onSubmit={submitWeek} className="space-y-4">
+          <div>
+            <label className="label">Judul Minggu *</label>
+            <input className="input" value={weekForm.title} onChange={(e) => setWeekForm((f) => ({ ...f, title: e.target.value }))} required placeholder="mis. Week 1" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Tanggal Mulai</label>
+              <input className="input" type="date" value={weekForm.startDate} onChange={(e) => setWeekForm((f) => ({ ...f, startDate: e.target.value }))} />
             </div>
-            {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>Batal</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</button>
+            <div>
+              <label className="label">Tanggal Selesai</label>
+              <input className="input" type="date" value={weekForm.endDate} onChange={(e) => setWeekForm((f) => ({ ...f, endDate: e.target.value }))} />
             </div>
-          </form>
-        </Modal>
-      )}
-    </div>
-  );
-}
+          </div>
+          {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" className="btn-ghost" onClick={() => setWeekModalOpen(false)}>Batal</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</button>
+          </div>
+        </form>
+      </Modal>
 
-function Quadrant({ color, label, text }: { color: string; label: string; text: string | null }) {
-  const head: Record<string, string> = {
-    blue:   "text-blue-700 dark:text-blue-400",
-    amber:  "text-amber-700 dark:text-amber-400",
-    violet: "text-violet-700 dark:text-violet-400",
-    orange: "text-orange-700 dark:text-orange-400",
-  };
-  return (
-    <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 p-3">
-      <p className={cn("mb-1 text-xs font-semibold uppercase tracking-wide", head[color])}>{label}</p>
-      <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{text || <span className="text-slate-300 dark:text-slate-600">—</span>}</p>
+      {/* Modal task */}
+      <Modal open={taskModalOpen} onClose={() => setTaskModalOpen(false)} title={editingTask ? "Ubah Task" : "Tambah Task"}>
+        <form onSubmit={submitTask} className="space-y-4">
+          <div>
+            <label className="label">Judul Task *</label>
+            <input className="input" value={taskForm.title} onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))} required placeholder="mis. Analisa Winning Content" />
+          </div>
+          <div>
+            <label className="label">PIC (Penanggung Jawab) *</label>
+            <select className="input" value={taskForm.userId} onChange={(e) => setTaskForm((f) => ({ ...f, userId: e.target.value }))} required>
+              {people.length === 0 && <option value={currentUserId}>Saya sendiri</option>}
+              {people.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select className="input" value={taskForm.status} onChange={(e) => setTaskForm((f) => ({ ...f, status: e.target.value as "BELUM_SELESAI" | "SELESAI" }))}>
+              <option value="BELUM_SELESAI">Belum Selesai</option>
+              <option value="SELESAI">Selesai</option>
+            </select>
+          </div>
+          {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" className="btn-ghost" onClick={() => setTaskModalOpen(false)}>Batal</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -21,13 +21,13 @@ const bodySchema = z.object({
 });
 
 export const POST = handle(async (req: NextRequest) => {
-  await requirePermission("assistant.use");
+  const user = await requirePermission("assistant.use");
   const { messages } = bodySchema.parse(await req.json());
 
   if (!isAnthropicConfigured()) {
     return ok({ reply: PLACEHOLDER_REPLY, configured: false });
   }
 
-  const reply = await sendAssistantChat(messages);
+  const reply = await sendAssistantChat(messages, user);
   return ok({ reply, configured: true });
 });

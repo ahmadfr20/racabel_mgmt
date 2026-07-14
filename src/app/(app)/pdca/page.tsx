@@ -7,5 +7,5 @@ export const dynamic = "force-dynamic";
 export default async function PdcaPage() {
   const user = (await getCurrentUser())!;
   if (!can(user, "pdca.view") && !can(user, "pdca.manage")) redirect("/dashboard");
-  return <PdcaClient canManage={can(user, "pdca.manage")} />;
+  return <PdcaClient canManage={can(user, "pdca.manage")} currentUserId={user.id} />;
 }

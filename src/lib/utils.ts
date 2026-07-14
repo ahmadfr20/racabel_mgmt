@@ -70,3 +70,33 @@ export const STATUS_LABEL: Record<string, string> = {
   APPROVED: "Disetujui",
   REJECTED: "Ditolak",
 };
+
+// ===== Ticketing =====
+export const TICKET_STATUS_LABEL: Record<string, string> = {
+  OPEN: "Terbuka",
+  IN_PROGRESS: "Dikerjakan",
+  RESOLVED: "Selesai",
+  CLOSED: "Ditutup",
+};
+
+export const TICKET_PRIORITY_LABEL: Record<string, string> = {
+  LOW: "Rendah",
+  MEDIUM: "Sedang",
+  HIGH: "Tinggi",
+  URGENT: "Mendesak",
+};
+
+// Kategori bawaan (bebas diketik juga di form)
+export const TICKET_CATEGORIES = ["Umum", "IT / Sistem", "Fasilitas", "HR / SDM", "Keuangan", "Operasional"];
+
+// Tiket dianggap "belum selesai" jika masih OPEN atau IN_PROGRESS
+export const TICKET_OPEN_STATUSES = ["OPEN", "IN_PROGRESS"] as const;
+
+// Overdue: punya due date, sudah lewat, dan belum selesai
+export function isTicketOverdue(dueDate: string | Date | null, status: string): boolean {
+  if (!dueDate) return false;
+  if (status === "RESOLVED" || status === "CLOSED") return false;
+  const due = new Date(dueDate);
+  const today = toDateOnly();
+  return due < today;
+}

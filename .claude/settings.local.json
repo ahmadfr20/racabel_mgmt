@@ -13,7 +13,16 @@
       "PowerShell(npm run predev)",
       "PowerShell(if \\($?\\) { \"predev OK\" })",
       "PowerShell(npm run db:seed)",
-      "PowerShell(npm run build)"
+      "PowerShell(npm run build)",
+      "Bash(rm -f src/app/api/pdca/route.ts src/app/api/pdca/\\\\[id\\\\]/route.ts)",
+      "Bash(rmdir src/app/api/pdca/\\\\[id\\\\])",
+      "Bash(node -e \"const i=require\\('lucide-react'\\); console.log\\('ImageOff' in i, 'ImageIcon' in i, 'Loader2' in i\\)\")",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(node check.js)",
+      "Bash(cp /c/Users/afato/AppData/Local/Temp/claude/c--Users-afato-OneDrive-Documents-nyobaan-hrapp/e7d77a84-912f-42aa-97a1-b70c5ac20553/scratchpad/schema.final.prisma /c/Users/afato/AppData/Local/Temp/claude/c--Users-afato-OneDrive-Documents-nyobaan-hrapp/e7d77a84-912f-42aa-97a1-b70c5ac20553/scratchpad/schema.additive.prisma)",
+      "Bash(node -e ' *)",
+      "Bash(ssh -i ~/.ssh/hrapp_deploy -o StrictHostKeyChecking=no root@202.10.41.199 'set -e; cd /var/www/racabel_mgmt && echo \"=== build ===\" && npm run build 2>&1 | tail -25 && echo \"=== restart ===\" && pm2 restart hrapp --update-env 2>&1 | tail -3 && sleep 3 && pm2 list | grep hrapp')"
     ]
   }
 }

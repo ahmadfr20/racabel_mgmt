@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileSpreadsheet, Loader2, Sparkles, TrendingDown, TrendingUp, Trash2, Upload, Wallet } from "lucide-react";
+import { FileSpreadsheet, GitCompareArrows, Loader2, Sparkles, TrendingDown, TrendingUp, Trash2, Upload, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { Card, PageHeader, StatCard, EmptyState } from "@/components/ui";
+import { FinancialAssistantChat } from "@/components/financial/FinancialAssistantChat";
 
 interface ImportSummary {
   id: number;
@@ -44,12 +45,28 @@ interface ImportDetail {
   transactions: Transaction[];
 }
 
+interface Comparison {
+  id: number;
+  title: string;
+  scopeALabel: string;
+  scopeBLabel: string;
+  totalIncomeA: number;
+  totalExpenseA: number;
+  totalIncomeB: number;
+  totalExpenseB: number;
+  analysis: string;
+  createdByName: string;
+  createdAt: string;
+}
+
 export function FinancialClient({ canUpload }: { canUpload: boolean }) {
   const [history, setHistory] = useState<ImportSummary[]>([]);
   const [selected, setSelected] = useState<ImportDetail | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [comparisons, setComparisons] = useState<Comparison[]>([]);
+  const [loadingComparisons, setLoadingComparisons] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -61,9 +78,25 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
     }
   }, []);
 
+  const loadComparisons = useCallback(async () => {
+    setLoadingComparisons(true);
+    try {
+      setComparisons(await apiFetch<Comparison[]>("/api/financial/comparisons"));
+    } finally {
+      setLoadingComparisons(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    loadComparisons();
+  }, [loadHistory, loadComparisons]);
+
+  async function removeComparison(id: number) {
+    if (!confirm("Hapus riwayat komparasi ini?")) return;
+    await apiFetch(`/api/financial/comparisons/${id}`, { method: "DELETE" });
+    await loadComparisons();
+  }
 
   async function openDetail(id: number) {
     const detail = await apiFetch<ImportDetail>(`/api/financial/import/${id}`);
@@ -137,6 +170,8 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
         </Card>
       )}
 
+      <FinancialAssistantChat canUpload={canUpload} onDataChanged={() => { loadHistory(); loadComparisons(); }} />
+
       {selected && <ImportResult detail={selected} onDelete={canUpload ? () => removeImport(selected.id) : undefined} />}
 
       <Card className="!p-0 overflow-hidden">
@@ -191,6 +226,61 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </Card>
+
+      <Card className="!p-0 overflow-hidden mt-6">
+        <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Riwayat Komparasi Keuangan</h3>
+        </div>
+        {loadingComparisons ? (
+          <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : comparisons.length === 0 ? (
+          <EmptyState
+            title="Belum ada hasil komparasi"
+            subtitle="Minta Asisten Keuangan AI di atas untuk membandingkan keuangan dan menyimpan hasilnya."
+            icon={<GitCompareArrows className="h-10 w-10" />}
+          />
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {comparisons.map((c) => {
+              const netA = c.totalIncomeA - c.totalExpenseA;
+              const netB = c.totalIncomeB - c.totalExpenseB;
+              return (
+                <div key={c.id} className="p-5">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-800 dark:text-slate-100">{c.title}</p>
+                      <p className="text-xs text-slate-400">oleh {c.createdByName} · {formatDate(c.createdAt, true)}</p>
+                    </div>
+                    {canUpload && (
+                      <button
+                        className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
+                        onClick={() => removeComparison(c.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{c.scopeALabel}</p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">Pemasukan: {formatCurrency(c.totalIncomeA)}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400">Pengeluaran: {formatCurrency(c.totalExpenseA)}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300">Net: {formatCurrency(netA)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{c.scopeBLabel}</p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">Pemasukan: {formatCurrency(c.totalIncomeB)}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400">Pengeluaran: {formatCurrency(c.totalExpenseB)}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300">Net: {formatCurrency(netB)}</p>
+                    </div>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{c.analysis}</p>
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>

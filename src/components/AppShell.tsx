@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileSpreadsheet, LayoutDashboard,
   LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
-  Store, Sun, Users, Wallet, X,
+  Store, Sun, Ticket, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
@@ -35,6 +35,7 @@ const NAV: NavItem[] = [
   { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
   { href: "/tasklog",    label: "Task Log",      icon: ClipboardList,   anyOf: ["tasklog.write", "tasklog.view_all"] },
   { href: "/pdca",       label: "PDCA",          icon: RefreshCcw,      anyOf: ["pdca.view", "pdca.manage"] },
+  { href: "/tickets",    label: "Ticketing",     icon: Ticket,          anyOf: ["tickets.create", "tickets.view_all", "tickets.manage"] },
   { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
   { href: "/financial",  label: "Keuangan",      icon: FileSpreadsheet, anyOf: ["financial.view", "financial.upload"] },
   { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
