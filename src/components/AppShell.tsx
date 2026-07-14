@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  Bot, CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileSpreadsheet, LayoutDashboard,
+  CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileSpreadsheet, LayoutDashboard,
   LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
   Store, Sun, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
+import { AssistantBubble } from "@/components/assistant/AssistantBubble";
 
 export interface ShellUser {
   fullName: string;
@@ -29,7 +30,6 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/dashboard",  label: "Dashboard",    icon: LayoutDashboard, anyOf: ["dashboard.view"] },
-  { href: "/assistant",  label: "Asisten AI",    icon: Bot,             anyOf: ["assistant.use"] },
   { href: "/attendance", label: "Absensi",       icon: CalendarClock,   anyOf: ["attendance.checkin", "attendance.view_all"] },
   { href: "/leave",      label: "Cuti",          icon: CalendarDays,    anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
   { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
@@ -137,6 +137,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
         <main className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+
+      {user.permissions.includes("assistant.use") && <AssistantBubble />}
     </div>
   );
 }
