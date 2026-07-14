@@ -11,6 +11,14 @@ const PLACEHOLDER_REPLY =
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const SPREADSHEET_EXT = /\.(csv|xlsx|xls)$/i;
 const PDF_EXT = /\.pdf$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
+const IMAGE_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 const messagesSchema = z
   .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) }))
@@ -55,8 +63,12 @@ export const POST = handle(async (req: NextRequest) => {
         const message = err instanceof SpreadsheetParseError ? err.message : "Gagal membaca file.";
         throw new AuthError(message, 400);
       }
+    } else if (IMAGE_EXT.test(file.name)) {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const mimeType = IMAGE_MIME[ext] ?? "image/jpeg";
+      attachment = { fileName: file.name, kind: "image", data: buffer.toString("base64"), mimeType };
     } else {
-      throw new AuthError("Format file tidak didukung. Gunakan .csv, .xlsx, .xls, atau .pdf.", 400);
+      throw new AuthError("Format file tidak didukung. Gunakan .csv, .xlsx, .xls, .pdf, atau gambar (jpg, png, gif, webp).", 400);
     }
   }
 
