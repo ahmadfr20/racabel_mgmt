@@ -2,8 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { CurrentUser } from "./auth";
 import { currentPeriod } from "./performance";
-import { toolsForUser } from "./assistantTools";
-import { financialToolsForUser } from "./financialAssistantTools";
+import { toolsForUser, ASSISTANT_TOOLS } from "./assistantTools";
+import { financialToolsForUser, FINANCIAL_ASSISTANT_TOOLS } from "./financialAssistantTools";
+import { CPAS_ASSISTANT_TOOLS } from "./cpasAssistantTools";
+import { SOP_ASSISTANT_TOOLS } from "./sopAssistantTools";
+import type { AssistantTool } from "./financialAssistantTools";
 
 // Singleton client — dibuat lazy agar error "API key belum diatur" muncul saat
 // fitur benar-benar dipakai, bukan saat aplikasi start.
@@ -217,6 +220,129 @@ export async function sendAssistantChat(messages: ChatMessage[], user: CurrentUs
     convo.push({ role: "assistant", content: response.content });
 
     // Jalankan semua tool yang diminta, kembalikan seluruh hasil dalam SATU pesan user.
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      const tool = map.get(tu.name);
+      let res;
+      if (!tool) {
+        res = { content: JSON.stringify({ error: `Tool ${tu.name} tidak tersedia` }), isError: true };
+      } else {
+        try {
+          res = await tool.run(tu.input, user);
+        } catch (e) {
+          res = { content: JSON.stringify({ error: e instanceof Error ? e.message : "Gagal menjalankan aksi" }), isError: true };
+        }
+      }
+      results.push({ type: "tool_result", tool_use_id: tu.id, content: res.content, is_error: res.isError });
+    }
+    convo.push({ role: "user", content: results });
+  }
+
+  return "Maaf, permintaan ini terlalu kompleks untuk saya selesaikan sekarang. Coba pecah menjadi langkah yang lebih kecil.";
+}
+
+// ============ AI Assistant universal (gabungan semua tool) ============
+
+const ALL_AI_ASSISTANT_TOOLS: AssistantTool[] = [
+  ...FINANCIAL_ASSISTANT_TOOLS,
+  ...ASSISTANT_TOOLS,
+  ...CPAS_ASSISTANT_TOOLS,
+  ...SOP_ASSISTANT_TOOLS,
+];
+
+function aiAssistantToolsForUser(user: CurrentUser): { defs: Anthropic.Tool[]; map: Map<string, AssistantTool> } {
+  const available = ALL_AI_ASSISTANT_TOOLS.filter((t) => t.available(user));
+  return {
+    defs: available.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
+    map: new Map(available.map((t) => [t.name, t])),
+  };
+}
+
+function buildAIAssistantSystemPrompt(user: CurrentUser, toolNames: string[]): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `Anda adalah AI Assistant pada aplikasi "Racabel HQ Management". Anda dapat MELAKUKAN aksi nyata melalui tools yang tersedia — bukan sekadar menjawab.
+
+Konteks pengguna saat ini:
+- Nama: ${user.fullName} (id: ${user.id})
+- Role: ${user.role.name}${user.department ? ` · Department: ${user.department.name}` : ""}
+- Tanggal hari ini: ${today}
+- Periode kinerja berjalan: ${currentPeriod()}
+
+Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya akses lihat terbatas)"}.
+
+Kemampuan Anda:
+1. **Keuangan**: Lihat riwayat impor, hitung total/komparasi, simpan transaksi baru, simpan komparasi. Bila ada file atau gambar terlampir (Excel/CSV/PDF/struk/nota), baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, nominal).
+2. **PDCA**: Buat minggu PDCA (create_pdca_week), tambah task dengan PIC (add_pdca_task), tandai status (update_pdca_task_status). Format sederhana: satu minggu berisi daftar task dengan judul + PIC + status.
+3. **Task Log**: Catat aktivitas harian (create_task_log), lihat rekap (list_task_logs).
+4. **Kinerja & Gaji**: Lihat metrik KPI (list_kpi_metrics), hitung estimasi gaji (get_performance_summary), catat skor kinerja (set_performance_score). PERHATIAN: skor memengaruhi tunjangan & gaji.
+5. **CPAS Plan Afiliasi**: Buat rencana Content, Promo, Audience, Strategy afiliasi (save_cpas_plan), lihat daftar (list_cpas_plans).
+6. **SOP Plan**: Buat Standar Operasional Prosedur afiliasi (save_sop_plan), lihat daftar (list_sop_plans).
+
+Pedoman:
+- Gunakan tools untuk benar-benar membuat/mengubah data ketika pengguna memintanya.
+- Untuk PIC atau karyawan lain, cari id dulu dengan list_employees.
+- Untuk skor kinerja, ambil id metrik dengan list_kpi_metrics terlebih dahulu.
+- Nominal keuangan selalu angka positif tanpa simbol mata uang. Asumsikan IDR bila tidak disebutkan.
+- Bila informasi kurang jelas, buat asumsi wajar dan sebutkan singkat, atau tanyakan bila benar-benar kritis.
+- Setelah menyimpan data, konfirmasikan ringkas & spesifik (id, judul, atau total yang dibuat).
+- Jika tool mengembalikan error, jelaskan ke pengguna dengan bahasa mudah.
+- Jawab dalam Bahasa Indonesia, singkat, jelas, dan berorientasi aksi.`;
+}
+
+export async function sendAIAssistantChat(
+  messages: ChatMessage[],
+  user: CurrentUser,
+  attachment?: FinancialAttachment
+): Promise<string> {
+  const anthropic = getClient();
+  const { defs, map } = aiAssistantToolsForUser(user);
+  const system = buildAIAssistantSystemPrompt(user, [...map.keys()]);
+
+  const lastUserIdx = messages.length - 1;
+  const convo: Anthropic.MessageParam[] = messages.map((m, i) => {
+    if (attachment && i === lastUserIdx && m.role === "user") {
+      let blocks: Anthropic.ContentBlockParam[];
+      if (attachment.kind === "pdf") {
+        blocks = [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: attachment.data } }];
+      } else if (attachment.kind === "image") {
+        blocks = [{ type: "image", source: { type: "base64", media_type: attachment.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: attachment.data } }];
+      } else {
+        blocks = [{ type: "text", text: `Isi file terlampir (${attachment.fileName}):\n\n${attachment.data}` }];
+      }
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      return { role: "user", content: blocks };
+    }
+    return { role: m.role, content: m.content };
+  });
+
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 4096,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      system,
+      tools: defs,
+      messages: convo,
+    });
+
+    if (response.stop_reason === "refusal") {
+      return "Maaf, saya tidak dapat membantu permintaan ini karena kebijakan keamanan.";
+    }
+
+    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+
+    if (toolUses.length === 0) {
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      return text || "Maaf, terjadi kesalahan saat menghasilkan balasan. Coba lagi.";
+    }
+
+    convo.push({ role: "assistant", content: response.content });
+
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const tu of toolUses) {
       const tool = map.get(tu.name);
