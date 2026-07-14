@@ -92,6 +92,10 @@ model User {
   ticketsRequested     Ticket[]              @relation("TicketRequester")
   ticketsAssigned      Ticket[]              @relation("TicketAssignee")
   ticketComments       TicketComment[]       @relation("TicketCommentAuthor")
+  cpasPicAssigned      CpasPlan[]            @relation("CpasPic")
+  cpasCreated          CpasPlan[]            @relation("CpasCreator")
+  sopPicAssigned       SopPlan[]             @relation("SopPic")
+  sopCreated           SopPlan[]             @relation("SopCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -412,4 +416,46 @@ model TicketComment {
   createdAt DateTime @default(now())
 
   @@index([ticketId])
+}
+
+// ============ AI Assistant: CPAS Plan & SOP Plan ============
+
+enum SopStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model CpasPlan {
+  id          Int      @id @default(autoincrement())
+  title       String
+  period      String
+  content     String   @db.Text
+  promo       String   @db.Text
+  audience    String   @db.Text
+  strategy    String   @db.Text
+  pic         User?    @relation("CpasPic", fields: [picId], references: [id])
+  picId       Int?
+  createdBy   User     @relation("CpasCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
+}
+
+model SopPlan {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String    @db.Text
+  department  String
+  pic         User?     @relation("SopPic", fields: [picId], references: [id])
+  picId       Int?
+  status      SopStatus @default(DRAFT)
+  createdBy   User      @relation("SopCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([createdById])
 }
