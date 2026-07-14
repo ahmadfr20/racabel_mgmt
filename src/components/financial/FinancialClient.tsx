@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FileSpreadsheet, GitCompareArrows, Loader2, Sparkles, TrendingDown, TrendingUp, Trash2, Upload, Wallet } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { FileSpreadsheet, GitCompareArrows, Loader2, TrendingDown, TrendingUp, Trash2, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { Card, PageHeader, StatCard, EmptyState } from "@/components/ui";
@@ -63,11 +63,8 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
   const [history, setHistory] = useState<ImportSummary[]>([]);
   const [selected, setSelected] = useState<ImportDetail | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const [comparisons, setComparisons] = useState<Comparison[]>([]);
   const [loadingComparisons, setLoadingComparisons] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -103,27 +100,6 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
     setSelected(detail);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadError("");
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/financial/import", { method: "POST", body: formData });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Gagal memproses file");
-      setSelected(data as ImportDetail);
-      await loadHistory();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Gagal memproses file");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
   async function removeImport(id: number) {
     if (!confirm("Hapus riwayat impor ini beserta seluruh transaksinya?")) return;
     await apiFetch(`/api/financial/import/${id}`, { method: "DELETE" });
@@ -134,41 +110,9 @@ export function FinancialClient({ canUpload }: { canUpload: boolean }) {
   return (
     <div>
       <PageHeader
-        title="Impor Data Keuangan (AI)"
-        subtitle="Unggah file Excel/CSV berisi data keuangan — AI akan membaca dan mengekstraknya secara otomatis menjadi data transaksi terstruktur."
+        title="Asisten Keuangan AI"
+        subtitle="Chat dengan AI untuk menyimpan transaksi, membandingkan data keuangan, atau menganalisis file dan gambar."
       />
-
-      {canUpload && (
-        <Card className="mb-6">
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 px-6 py-10 text-center">
-            {uploading ? (
-              <>
-                <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                  Membaca &amp; mengekstrak data dengan AI... ini bisa memakan waktu hingga sekitar 1 menit.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400">
-                  <Upload className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-700 dark:text-slate-200">Unggah file Excel (.xlsx/.xls) atau CSV</p>
-                  <p className="mt-1 text-xs text-slate-400">Maks. 5MB. Data akan dibaca &amp; dikategorikan otomatis oleh AI.</p>
-                </div>
-                <label className="btn-primary cursor-pointer">
-                  <Sparkles className="h-4 w-4" /> Pilih File &amp; Ekstrak
-                  <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
-                </label>
-              </>
-            )}
-          </div>
-          {uploadError && (
-            <div className="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">{uploadError}</div>
-          )}
-        </Card>
-      )}
 
       <FinancialAssistantChat canUpload={canUpload} onDataChanged={() => { loadHistory(); loadComparisons(); }} />
 
