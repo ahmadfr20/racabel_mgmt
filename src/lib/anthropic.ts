@@ -244,8 +244,9 @@ export async function sendAssistantChat(messages: ChatMessage[], user: CurrentUs
 
 export interface FinancialAttachment {
   fileName: string;
-  kind: "pdf" | "text";
-  data: string; // base64 untuk pdf, teks polos (CSV) untuk kind "text"
+  kind: "pdf" | "text" | "image";
+  data: string; // base64 untuk pdf/image, teks polos untuk kind "text"
+  mimeType?: string; // wajib untuk kind "image", mis. "image/png"
 }
 
 function buildFinancialSystemPrompt(user: CurrentUser, toolNames: string[]): string {
@@ -281,10 +282,14 @@ export async function sendFinancialAssistantChat(
   const lastUserIdx = messages.length - 1;
   const convo: Anthropic.MessageParam[] = messages.map((m, i) => {
     if (attachment && i === lastUserIdx && m.role === "user") {
-      const blocks: Anthropic.ContentBlockParam[] =
-        attachment.kind === "pdf"
-          ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: attachment.data } }]
-          : [{ type: "text", text: `Isi file terlampir (${attachment.fileName}):\n\n${attachment.data}` }];
+      let blocks: Anthropic.ContentBlockParam[];
+      if (attachment.kind === "pdf") {
+        blocks = [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: attachment.data } }];
+      } else if (attachment.kind === "image") {
+        blocks = [{ type: "image", source: { type: "base64", media_type: attachment.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: attachment.data } }];
+      } else {
+        blocks = [{ type: "text", text: `Isi file terlampir (${attachment.fileName}):\n\n${attachment.data}` }];
+      }
       if (m.content) blocks.push({ type: "text", text: m.content });
       return { role: "user", content: blocks };
     }
