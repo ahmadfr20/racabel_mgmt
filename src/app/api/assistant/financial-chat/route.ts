@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { handle, ok } from "@/lib/api";
 import { requireUser, AuthError } from "@/lib/auth";
-import { isAnthropicConfigured, sendFinancialAssistantChat, type ChatMessage, type FinancialAttachment } from "@/lib/anthropic";
+import { isAnthropicConfigured, sendAIAssistantChat, type ChatMessage, type FinancialAttachment } from "@/lib/anthropic";
 import { parseSpreadsheetToText, SpreadsheetParseError } from "@/lib/spreadsheet";
 
 const PLACEHOLDER_REPLY =
@@ -76,6 +76,6 @@ export const POST = handle(async (req: NextRequest) => {
     return ok({ reply: PLACEHOLDER_REPLY, configured: false });
   }
 
-  const reply = await sendFinancialAssistantChat(messages, user, attachment);
+  const reply = await sendAIAssistantChat(messages, user, attachment);
   return ok({ reply, configured: true });
 });
