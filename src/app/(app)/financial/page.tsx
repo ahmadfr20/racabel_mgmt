@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, can } from "@/lib/auth";
-import { FinancialClient } from "@/components/financial/FinancialClient";
+import { AIAssistantClient } from "@/components/financial/AIAssistantClient";
 
-export default async function FinancialPage() {
+export default async function AIAssistantPage() {
   const user = (await getCurrentUser())!;
   if (!can(user, "financial.view")) redirect("/dashboard");
-  return <FinancialClient canUpload={can(user, "financial.upload")} />;
+  return <AIAssistantClient canUpload={can(user, "financial.upload")} />;
 }

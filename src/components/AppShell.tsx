@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileSpreadsheet, LayoutDashboard,
+  Bot, CalendarClock, CalendarDays, ChevronDown, ClipboardList, LayoutDashboard,
   LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
   Store, Sun, Ticket, Users, Wallet, X,
 } from "lucide-react";
@@ -37,7 +37,7 @@ const NAV: NavItem[] = [
   { href: "/pdca",       label: "PDCA",          icon: RefreshCcw,      anyOf: ["pdca.view", "pdca.manage"] },
   { href: "/tickets",    label: "Ticketing",     icon: Ticket,          anyOf: ["tickets.create", "tickets.view_all", "tickets.manage"] },
   { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
-  { href: "/financial",  label: "Keuangan",      icon: FileSpreadsheet, anyOf: ["financial.view", "financial.upload"] },
+  { href: "/financial",  label: "AI Assistant",  icon: Bot,             anyOf: ["financial.view", "financial.upload"] },
   { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
   { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["dashboard.view"] },
   { href: "/shopee",     label: "Shopee",        icon: ShoppingCart,    anyOf: ["dashboard.view"] },
