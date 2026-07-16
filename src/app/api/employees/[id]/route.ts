@@ -27,8 +27,13 @@ export const GET = handle(async (_req: NextRequest, ctx: { params: Promise<{ id:
     address: u.address,
     emergencyName: u.emergencyName,
     emergencyPhone: u.emergencyPhone,
+    bankName: u.bankName,
+    bankAccountNumber: u.bankAccountNumber,
     baseSalary: u.baseSalary,
     performanceAllowance: u.performanceAllowance,
+    employmentStatus: u.employmentStatus,
+    contractStartDate: u.contractStartDate,
+    contractEndDate: u.contractEndDate,
     role: { id: u.role.id, name: u.role.name, color: u.role.color },
     department: u.department ? { id: u.department.id, name: u.department.name } : null,
   });
@@ -50,6 +55,11 @@ const updateSchema = z.object({
   address: z.string().optional(),
   emergencyName: z.string().optional(),
   emergencyPhone: z.string().optional(),
+  bankName: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  employmentStatus: z.enum(["MAGANG", "KONTRAK", "PEGAWAI_TETAP"]).optional(),
+  contractStartDate: z.string().nullable().optional(),
+  contractEndDate: z.string().nullable().optional(),
 });
 
 export const PATCH = handle(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -75,6 +85,11 @@ export const PATCH = handle(async (req: NextRequest, ctx: { params: Promise<{ id
       ...(data.address !== undefined ? { address: data.address || null } : {}),
       ...(data.emergencyName !== undefined ? { emergencyName: data.emergencyName || null } : {}),
       ...(data.emergencyPhone !== undefined ? { emergencyPhone: data.emergencyPhone || null } : {}),
+      ...(data.bankName !== undefined ? { bankName: data.bankName || null } : {}),
+      ...(data.bankAccountNumber !== undefined ? { bankAccountNumber: data.bankAccountNumber || null } : {}),
+      ...(data.employmentStatus !== undefined ? { employmentStatus: data.employmentStatus } : {}),
+      ...(data.contractStartDate !== undefined ? { contractStartDate: data.contractStartDate ? new Date(data.contractStartDate) : null } : {}),
+      ...(data.contractEndDate !== undefined ? { contractEndDate: data.contractEndDate ? new Date(data.contractEndDate) : null } : {}),
     },
   });
   return ok({ success: true });

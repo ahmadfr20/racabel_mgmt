@@ -29,12 +29,12 @@ function parseDate(s?: string | null): Date {
 const listFinancialImports: AssistantTool = {
   name: "list_financial_imports",
   description:
-    "Lihat daftar riwayat data keuangan tersimpan (id, nama, total pemasukan/pengeluaran, jumlah transaksi, tanggal dibuat). Gunakan untuk menemukan id data yang ingin dilihat detail atau dibandingkan.",
+    "Lihat daftar riwayat data keuangan tersimpan (id, nama, total pemasukan/pengeluaran, jumlah transaksi, visibilitas, tanggal dibuat). Hanya menampilkan data milik pengguna sendiri, ditambah data orang lain yang visibilitasnya 'EVERYONE'. Gunakan untuk menemukan id data yang ingin dilihat detail atau dibandingkan.",
   input_schema: { type: "object", properties: {} },
   available: (u) => u.permissions.includes("financial.view"),
-  run: async () => {
+  run: async (_input, user) => {
     const rows = await prisma.financialImport.findMany({
-      where: { status: "COMPLETED" },
+      where: { status: "COMPLETED", OR: [{ uploadedById: user.id }, { visibility: "EVERYONE" }] },
       include: { _count: { select: { transactions: true } } },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -46,6 +46,8 @@ const listFinancialImports: AssistantTool = {
         totalIncome: r.totalIncome,
         totalExpense: r.totalExpense,
         transactionCount: r._count.transactions,
+        visibility: r.visibility,
+        isOwner: r.uploadedById === user.id,
         createdAt: r.createdAt,
       }))
     );
@@ -55,25 +57,29 @@ const listFinancialImports: AssistantTool = {
 // ============ Tool: detail transaksi 1 data keuangan ============
 const getFinancialImportDetail: AssistantTool = {
   name: "get_financial_import_detail",
-  description: "Lihat detail transaksi (tanggal, deskripsi, kategori, jenis, nominal) dari satu data keuangan berdasarkan id.",
+  description: "Lihat detail transaksi (tanggal, deskripsi, kategori, jenis, nominal) dari satu data keuangan berdasarkan id. Hanya bisa diakses bila milik sendiri atau visibilitasnya 'EVERYONE'.",
   input_schema: {
     type: "object",
     properties: { importId: { type: "number", description: "Id data keuangan (dari list_financial_imports)" } },
     required: ["importId"],
   },
   available: (u) => u.permissions.includes("financial.view"),
-  run: async (input) => {
+  run: async (input, user) => {
     const { importId } = z.object({ importId: z.number().int().positive() }).parse(input);
     const record = await prisma.financialImport.findUnique({
       where: { id: importId },
       include: { transactions: { orderBy: { date: "asc" } } },
     });
     if (!record) return err(`Data keuangan id ${importId} tidak ditemukan`);
+    if (record.uploadedById !== user.id && record.visibility !== "EVERYONE") {
+      return err(`Data keuangan id ${importId} bersifat privat milik pengguna lain, tidak dapat diakses`);
+    }
     return ok({
       id: record.id,
       title: record.fileName,
       totalIncome: record.totalIncome,
       totalExpense: record.totalExpense,
+      visibility: record.visibility,
       transactions: record.transactions.map((t) => ({
         date: t.date, description: t.description, category: t.category, type: t.type, amount: t.amount,
       })),
@@ -85,7 +91,7 @@ const getFinancialImportDetail: AssistantTool = {
 const getFinancialTotals: AssistantTool = {
   name: "get_financial_totals",
   description:
-    "Hitung total pemasukan & pengeluaran dari SELURUH transaksi keuangan tersimpan, opsional difilter rentang tanggal dan/atau kategori. Berguna untuk analisis/komparasi periode tanpa perlu tahu id data spesifik terlebih dahulu (mis. bandingkan 'bulan ini' vs 'bulan lalu').",
+    "Hitung total pemasukan & pengeluaran dari transaksi keuangan yang dapat diakses pengguna (miliknya sendiri + yang visibilitasnya 'EVERYONE'), opsional difilter rentang tanggal dan/atau kategori. Berguna untuk analisis/komparasi periode tanpa perlu tahu id data spesifik terlebih dahulu (mis. bandingkan 'bulan ini' vs 'bulan lalu').",
   input_schema: {
     type: "object",
     properties: {
@@ -95,11 +101,12 @@ const getFinancialTotals: AssistantTool = {
     },
   },
   available: (u) => u.permissions.includes("financial.view"),
-  run: async (input) => {
+  run: async (input, user) => {
     const { from, to, category } = z
       .object({ from: z.string().optional(), to: z.string().optional(), category: z.string().optional() })
       .parse(input ?? {});
     const where = {
+      import: { OR: [{ uploadedById: user.id }, { visibility: "EVERYONE" as const }] },
       ...(from || to ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
       ...(category ? { category: { contains: category } } : {}),
     };
@@ -134,6 +141,11 @@ const saveTransactions: AssistantTool = {
       title: { type: "string", description: "Judul/nama riwayat, mis. nama file asal atau deskripsi ringkas (\"Input manual - biaya operasional Juli\")" },
       currency: { type: "string", description: "Kode mata uang ISO 4217, default IDR" },
       notes: { type: "string", description: "Catatan ringkas (opsional), mis. ambiguitas atau asumsi yang diambil" },
+      visibility: {
+        type: "string",
+        enum: ["PRIVATE", "EVERYONE"],
+        description: "Siapa yang boleh melihat data ini. PRIVATE (default) = hanya pengguna ini sendiri. EVERYONE = semua pengguna yang punya akses lihat keuangan. Default PRIVATE kecuali pengguna secara eksplisit minta dibagikan/terlihat semua orang.",
+      },
       transactions: {
         type: "array",
         description: "Daftar transaksi yang akan disimpan",
@@ -160,6 +172,7 @@ const saveTransactions: AssistantTool = {
         title: z.string().min(1),
         currency: z.string().optional(),
         notes: z.string().optional(),
+        visibility: z.enum(["PRIVATE", "EVERYONE"]).default("PRIVATE"),
         transactions: z
           .array(
             z.object({
@@ -183,6 +196,7 @@ const saveTransactions: AssistantTool = {
         fileName: d.title,
         uploadedById: user.id,
         status: "COMPLETED",
+        visibility: d.visibility,
         currency: d.currency || "IDR",
         totalIncome,
         totalExpense,
@@ -206,6 +220,7 @@ const saveTransactions: AssistantTool = {
       transactionCount: d.transactions.length,
       totalIncome,
       totalExpense,
+      visibility: created.visibility,
     });
   },
 };
@@ -226,6 +241,11 @@ const saveFinancialComparison: AssistantTool = {
       totalIncomeB: { type: "number" },
       totalExpenseB: { type: "number" },
       analysis: { type: "string", description: "Ringkasan/insight komparasi dalam Bahasa Indonesia (mis. kenaikan/penurunan, penyebab, rekomendasi)" },
+      visibility: {
+        type: "string",
+        enum: ["PRIVATE", "EVERYONE"],
+        description: "Siapa yang boleh melihat hasil komparasi ini. PRIVATE (default) = hanya pengguna ini sendiri. EVERYONE = semua pengguna yang punya akses lihat keuangan.",
+      },
     },
     required: ["title", "scopeALabel", "scopeBLabel", "totalIncomeA", "totalExpenseA", "totalIncomeB", "totalExpenseB", "analysis"],
   },
@@ -241,12 +261,13 @@ const saveFinancialComparison: AssistantTool = {
         totalIncomeB: z.number(),
         totalExpenseB: z.number(),
         analysis: z.string().min(1),
+        visibility: z.enum(["PRIVATE", "EVERYONE"]).default("PRIVATE"),
       })
       .parse(input);
     const created = await prisma.financialComparison.create({
       data: { ...d, createdById: user.id },
     });
-    return ok({ message: "Hasil komparasi keuangan tersimpan", id: created.id, title: created.title });
+    return ok({ message: "Hasil komparasi keuangan tersimpan", id: created.id, title: created.title, visibility: created.visibility });
   },
 };
 

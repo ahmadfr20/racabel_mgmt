@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Clock, LogIn, LogOut, CheckCircle2, ImageOff, Loader2 } from "lucide-react";
+import { CalendarClock, Clock, LogIn, LogOut, CheckCircle2, ImageOff, Loader2, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatTime, formatDate, minutesToLabel, STATUS_LABEL, cn } from "@/lib/utils";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
@@ -22,7 +22,7 @@ interface Record {
   checkOutAt: string | null; checkOutStatus: string | null; earlyMinutes: number; workedMinutes: number;
 }
 
-export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boolean; canViewAll: boolean }) {
+export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: { canCheckin: boolean; canViewAll: boolean; canManage?: boolean }) {
   const [today, setToday] = useState<Today | null>(null);
   const [mode, setMode] = useState<"in" | "out" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +68,16 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
 
   function openPhoto(title: string, url: string) {
     setPhoto({ title, url });
+  }
+
+  async function removeRecord(r: Record) {
+    if (!confirm(`Hapus data absensi ${r.user.fullName} tanggal ${formatDate(r.date)}? Tindakan ini tidak dapat dibatalkan.`)) return;
+    try {
+      await apiFetch(`/api/attendance/${r.id}`, { method: "DELETE" });
+      await loadRecords();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus data absensi");
+    }
   }
 
   const att = today?.attendance;
@@ -167,6 +177,7 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
                   <th className="px-5 py-3 font-medium">Pulang</th>
                   <th className="px-5 py-3 font-medium">Durasi</th>
                   <th className="px-5 py-3 font-medium">Foto</th>
+                  {canManage && <th className="px-5 py-3" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -206,6 +217,17 @@ export function AttendanceClient({ canCheckin, canViewAll }: { canCheckin: boole
                         )}
                       </div>
                     </td>
+                    {canManage && (
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => removeRecord(r)}
+                          className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          title="Hapus data absensi"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

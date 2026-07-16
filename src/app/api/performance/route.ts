@@ -3,13 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { handle, ok } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
-import { currentPeriod } from "@/lib/performance";
+import { currentPeriod, syncAutoPerformanceRecords } from "@/lib/performance";
 
 // GET /api/performance?userId=&period= — capaian KPI seorang karyawan pada periode.
 export const GET = handle(async (req: NextRequest) => {
   await requirePermission("payroll.manage");
   const userId = Number(req.nextUrl.searchParams.get("userId"));
   const period = req.nextUrl.searchParams.get("period") || currentPeriod();
+
+  await syncAutoPerformanceRecords(userId, period);
 
   const [metrics, records, user] = await Promise.all([
     // Metrik yang berlaku untuk user: KPI umum (userId null) + KPI khusus miliknya.
@@ -22,7 +24,14 @@ export const GET = handle(async (req: NextRequest) => {
   return ok({
     period,
     user,
-    metrics: metrics.map((m) => ({ id: m.id, name: m.name, weight: m.weight, score: scoreByMetric.get(m.id) ?? 0 })),
+    metrics: metrics.map((m) => ({
+      id: m.id,
+      name: m.name,
+      weight: m.weight,
+      score: scoreByMetric.get(m.id) ?? 0,
+      isAuto: m.isAuto,
+      autoSource: m.autoSource,
+    })),
   });
 });
 
@@ -32,13 +41,19 @@ const putSchema = z.object({
   scores: z.array(z.object({ metricId: z.number().int(), score: z.coerce.number().min(0).max(100) })),
 });
 
-// PUT /api/performance — simpan capaian KPI (pembobotan dihitung dari bobot metric).
+// PUT /api/performance — simpan capaian KPI manual (pembobotan dihitung dari bobot metric).
+// Metrik otomatis (isAuto) diabaikan di sini — nilainya hanya diisi oleh syncAutoPerformanceRecords.
 export const PUT = handle(async (req: NextRequest) => {
   await requirePermission("payroll.manage");
   const { userId, period, scores } = putSchema.parse(await req.json());
 
+  const metricIds = scores.map((s) => s.metricId);
+  const metrics = await prisma.kpiMetric.findMany({ where: { id: { in: metricIds } } });
+  const autoIds = new Set(metrics.filter((m) => m.isAuto).map((m) => m.id));
+  const manualScores = scores.filter((s) => !autoIds.has(s.metricId));
+
   await prisma.$transaction(
-    scores.map((s) =>
+    manualScores.map((s) =>
       prisma.performanceRecord.upsert({
         where: { userId_metricId_period: { userId, metricId: s.metricId, period } },
         update: { score: s.score },

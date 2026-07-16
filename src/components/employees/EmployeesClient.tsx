@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Search, UserPlus, Users } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { Modal } from "@/components/Modal";
+
+type EmploymentStatus = "MAGANG" | "KONTRAK" | "PEGAWAI_TETAP";
 
 interface Employee {
   id: number;
@@ -17,15 +19,26 @@ interface Employee {
   isActive: boolean;
   baseSalary: number;
   performanceAllowance: number;
+  employmentStatus: EmploymentStatus;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
   role: { id: number; name: string; color: string };
   department: { id: number; name: string } | null;
 }
 interface Option { id: number; name: string; color?: string }
 
+const BANKS = ["BCA", "BNI", "BRI", "Mandiri", "BSI", "CIMB Niaga", "Danamon", "Permata", "BTN", "Lainnya"];
+
+const EMPLOYMENT_STATUS_LABEL: Record<EmploymentStatus, string> = {
+  PEGAWAI_TETAP: "Pegawai Tetap", KONTRAK: "Kontrak", MAGANG: "Magang",
+};
+
 const EMPTY = {
   username: "", password: "", email: "", fullName: "", birthDate: "", joinDate: "",
   roleId: "", departmentId: "", baseSalary: "0", performanceAllowance: "0", isActive: true,
   photo: "", ktpPhoto: "", address: "", emergencyName: "", emergencyPhone: "",
+  bankName: "", bankAccountNumber: "",
+  employmentStatus: "PEGAWAI_TETAP" as EmploymentStatus, contractStartDate: "", contractEndDate: "",
 };
 
 // Konversi File gambar -> data URL (base64) untuk disimpan di DB.
@@ -86,6 +99,9 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
       roleId: String(e.role.id), departmentId: e.department ? String(e.department.id) : "",
       baseSalary: String(e.baseSalary), performanceAllowance: String(e.performanceAllowance),
       isActive: e.isActive,
+      employmentStatus: e.employmentStatus,
+      contractStartDate: e.contractStartDate ? e.contractStartDate.slice(0, 10) : "",
+      contractEndDate: e.contractEndDate ? e.contractEndDate.slice(0, 10) : "",
     });
     setOpen(true);
     try {
@@ -94,6 +110,7 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
         ...f,
         photo: d.photo ?? "", ktpPhoto: d.ktpPhoto ?? "", address: d.address ?? "",
         emergencyName: d.emergencyName ?? "", emergencyPhone: d.emergencyPhone ?? "",
+        bankName: d.bankName ?? "", bankAccountNumber: d.bankAccountNumber ?? "",
       }));
     } catch { /* biarkan form dasar */ }
   }
@@ -109,6 +126,10 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
         baseSalary: Number(form.baseSalary), performanceAllowance: Number(form.performanceAllowance),
         photo: form.photo, ktpPhoto: form.ktpPhoto, address: form.address,
         emergencyName: form.emergencyName, emergencyPhone: form.emergencyPhone,
+        bankName: form.bankName, bankAccountNumber: form.bankAccountNumber,
+        employmentStatus: form.employmentStatus,
+        contractStartDate: form.employmentStatus === "PEGAWAI_TETAP" ? null : (form.contractStartDate || null),
+        contractEndDate: form.employmentStatus === "PEGAWAI_TETAP" ? null : (form.contractEndDate || null),
       };
       if (editing) {
         payload.isActive = form.isActive;
@@ -136,6 +157,16 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
       await apiFetch(`/api/employees/${e.id}`, { method: "PATCH", body: JSON.stringify({ isActive: true }) });
     }
     await load();
+  }
+
+  async function hardDelete(e: Employee) {
+    if (!confirm(`Hapus PERMANEN data ${e.fullName}? Tindakan ini tidak dapat dibatalkan dan hanya berhasil jika karyawan belum punya riwayat data (absensi/gaji/kinerja/dsb).`)) return;
+    try {
+      await apiFetch(`/api/employees/${e.id}/permanent`, { method: "POST" });
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus permanen");
+    }
   }
 
   const set = (k: string) => (ev: any) => setForm((f: any) => ({ ...f, [k]: ev.target.value }));
@@ -210,9 +241,16 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                     <td className="px-5 py-3 text-slate-600">{formatDate(e.joinDate)}</td>
                     {perms.payroll && <td className="px-5 py-3 text-slate-600">{formatCurrency(e.baseSalary)}</td>}
                     <td className="px-5 py-3">
-                      <span className={`badge ${e.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                        {e.isActive ? "Aktif" : "Nonaktif"}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        <span className={`badge ${e.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                          {e.isActive ? "Aktif" : "Nonaktif"}
+                        </span>
+                        {e.employmentStatus !== "PEGAWAI_TETAP" && (
+                          <span className="badge bg-amber-50 text-amber-700" title={e.contractEndDate ? `Sampai ${formatDate(e.contractEndDate)}` : undefined}>
+                            {EMPLOYMENT_STATUS_LABEL[e.employmentStatus]}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     {(perms.edit || perms.delete) && (
                       <td className="px-5 py-3">
@@ -227,6 +265,11 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                               {e.isActive ? "Nonaktifkan" : "Aktifkan"}
                             </button>
                           )}
+                          {perms.delete && (
+                            <button onClick={() => hardDelete(e)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus Permanen">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -238,7 +281,7 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
         </Card>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Ubah Karyawan" : "Registrasi Karyawan Baru"} size="lg">
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Ubah Karyawan" : "Registrasi Karyawan Baru"} size="xl">
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -279,6 +322,26 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                 {depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
+            <div>
+              <label className="label">Status Karyawan *</label>
+              <select className="input" value={form.employmentStatus} onChange={set("employmentStatus")} required>
+                <option value="PEGAWAI_TETAP">Pegawai Tetap</option>
+                <option value="KONTRAK">Kontrak</option>
+                <option value="MAGANG">Magang</option>
+              </select>
+            </div>
+            {(form.employmentStatus === "KONTRAK" || form.employmentStatus === "MAGANG") && (
+              <>
+                <div>
+                  <label className="label">Periode Mulai *</label>
+                  <input className="input" type="date" value={form.contractStartDate} onChange={set("contractStartDate")} required />
+                </div>
+                <div>
+                  <label className="label">Periode Sampai *</label>
+                  <input className="input" type="date" value={form.contractEndDate} onChange={set("contractEndDate")} required />
+                </div>
+              </>
+            )}
             {editing && (
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -341,6 +404,18 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
             <div>
               <label className="label">Kontak Darurat — No. Telepon</label>
               <input className="input" value={form.emergencyPhone} onChange={set("emergencyPhone")} placeholder="08xxxxxxxxxx" />
+            </div>
+
+            <div>
+              <label className="label">Bank</label>
+              <select className="input" value={form.bankName} onChange={set("bankName")}>
+                <option value="">— Pilih bank —</option>
+                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Nomor Rekening</label>
+              <input className="input" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} placeholder="Nomor rekening bank" />
             </div>
           </div>
 

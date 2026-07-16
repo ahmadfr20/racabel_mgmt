@@ -50,6 +50,7 @@ model Department {
   description String?
   users       User[]
   schedule    WorkSchedule?
+  pdcaWeeks   PdcaWeek[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -69,7 +70,13 @@ model User {
   address        String?   @db.Text // alamat lengkap
   emergencyName  String? // nama pemilik kontak darurat
   emergencyPhone String? // nomor telepon kontak darurat
+  bankName          String? // nama bank, mis. BNI, BCA
+  bankAccountNumber String? // nomor rekening
   isActive       Boolean   @default(true)
+
+  employmentStatus  EmploymentStatus @default(PEGAWAI_TETAP)
+  contractStartDate DateTime?        @db.Date // hanya relevan utk MAGANG/KONTRAK
+  contractEndDate   DateTime?        @db.Date // hanya relevan utk MAGANG/KONTRAK
 
   roleId       Int
   role         Role        @relation(fields: [roleId], references: [id])
@@ -97,8 +104,21 @@ model User {
   sopPicAssigned       SopPlan[]             @relation("SopPic")
   sopCreated           SopPlan[]             @relation("SopCreator")
 
+  contractsAsEmployee       ContractAgreement[]        @relation("ContractEmployee")
+  contractsSigned           ContractAgreement[]        @relation("ContractCompanySigner")
+  loasReceived              LetterOfAcceptance[]       @relation("LoaEmployee")
+  loasGenerated             LetterOfAcceptance[]       @relation("LoaGenerator")
+  contractExtensionRequests ContractExtensionRequest[] @relation("ExtensionRequester")
+  contractExtensionReviews  ContractExtensionRequest[] @relation("ExtensionReviewer")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum EmploymentStatus {
+  MAGANG
+  KONTRAK
+  PEGAWAI_TETAP
 }
 
 // ============ Jam kerja & toleransi (per department, null = default global) ============
@@ -183,12 +203,21 @@ model LeaveRequest {
 
 // ============ Kinerja & Penggajian (pembobotan) ============
 
+enum KpiAutoSource {
+  TASKLOG
+  PDCA
+  TICKET
+  ATTENDANCE
+}
+
 model KpiMetric {
   id           Int                 @id @default(autoincrement())
   name         String
   description  String?
   weight       Float               @default(0) // bobot (%) — total semua metric idealnya 100
   active       Boolean             @default(true)
+  isAuto       Boolean             @default(false) // skor dihitung otomatis dari data sistem, tidak bisa diinput manual
+  autoSource   KpiAutoSource? // sumber data untuk perhitungan otomatis (hanya jika isAuto)
   // Jika userId null = KPI umum (berlaku untuk semua karyawan).
   // Jika terisi = KPI khusus milik karyawan tersebut.
   userId       Int?
@@ -270,15 +299,18 @@ enum PdcaTaskStatus {
 }
 
 model PdcaWeek {
-  id        Int        @id @default(autoincrement())
-  title     String // mis. "Week 1"
-  startDate DateTime?  @db.Date
-  endDate   DateTime?  @db.Date
-  tasks     PdcaTask[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id           Int        @id @default(autoincrement())
+  title        String // mis. "Week 1"
+  startDate    DateTime?  @db.Date
+  endDate      DateTime?  @db.Date
+  departmentId Int // minggu PDCA khusus untuk satu department; task di dalamnya hanya boleh PIC dari department ini
+  department   Department @relation(fields: [departmentId], references: [id])
+  tasks        PdcaTask[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([startDate])
+  @@index([departmentId])
 }
 
 model PdcaTask {
@@ -310,12 +342,20 @@ enum FinancialTransactionType {
   EXPENSE
 }
 
+// Siapa yang boleh melihat data keuangan yang diinput: hanya penginput sendiri (default),
+// atau semua orang yang punya financial.view.
+enum FinancialVisibility {
+  PRIVATE
+  EVERYONE
+}
+
 model FinancialImport {
   id           Int                    @id @default(autoincrement())
   fileName     String
   uploadedBy   User                   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
   uploadedById Int
   status       FinancialImportStatus  @default(PROCESSING)
+  visibility   FinancialVisibility    @default(PRIVATE)
   currency     String                 @default("IDR")
   totalIncome  Float                  @default(0)
   totalExpense Float                  @default(0)
@@ -346,18 +386,19 @@ model FinancialTransaction {
 // Hasil komparasi keuangan (dibuat oleh Asisten AI Keuangan lewat chat) antara
 // dua ruang lingkup — mis. dua periode, atau dua data impor — beserta insight-nya.
 model FinancialComparison {
-  id            Int      @id @default(autoincrement())
+  id            Int                 @id @default(autoincrement())
   title         String
   scopeALabel   String // deskripsi ruang lingkup A, mis. "Juni 2026" atau "Impor #3"
   scopeBLabel   String
-  totalIncomeA  Float    @default(0)
-  totalExpenseA Float    @default(0)
-  totalIncomeB  Float    @default(0)
-  totalExpenseB Float    @default(0)
-  analysis      String   @db.Text // ringkasan/insight komparasi dari AI
-  createdBy     User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  totalIncomeA  Float               @default(0)
+  totalExpenseA Float               @default(0)
+  totalIncomeB  Float               @default(0)
+  totalExpenseB Float               @default(0)
+  analysis      String              @db.Text // ringkasan/insight komparasi dari AI
+  visibility    FinancialVisibility @default(PRIVATE)
+  createdBy     User                @relation(fields: [createdById], references: [id], onDelete: Cascade)
   createdById   Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime            @default(now())
 
   @@index([createdById])
 }
@@ -458,4 +499,71 @@ model SopPlan {
   updatedAt   DateTime  @updatedAt
 
   @@index([createdById])
+}
+
+// ============ Kontrak, Letter of Acceptance, & Perpanjangan Kontrak ============
+
+// Perjanjian kontrak/magang yang ditandatangani langsung dalam satu sesi oleh
+// perwakilan perusahaan (CEO/HR) dan karyawan ybs (tanda tangan digital di canvas).
+model ContractAgreement {
+  id                Int              @id @default(autoincrement())
+  user              User             @relation("ContractEmployee", fields: [userId], references: [id], onDelete: Cascade)
+  userId            Int
+  employmentStatus  EmploymentStatus // KONTRAK atau MAGANG pada saat penandatanganan
+  startDate         DateTime         @db.Date
+  endDate           DateTime         @db.Date
+  position          String? // jabatan/posisi (opsional)
+  terms             String?          @db.Text // catatan/klausul tambahan (opsional)
+  companySigner     User             @relation("ContractCompanySigner", fields: [companySignerId], references: [id])
+  companySignerId   Int
+  companySignerName String // snapshot nama penandatangan perusahaan saat itu
+  companySignature  String           @db.LongText // data URL PNG
+  employeeSignature String           @db.LongText // data URL PNG
+  signedAt          DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+
+  @@index([userId])
+}
+
+// Letter of Acceptance (LoA) penerimaan karyawan baru — satu tanda tangan dari
+// pihak yang menerbitkan (HR/CEO).
+model LetterOfAcceptance {
+  id               Int              @id @default(autoincrement())
+  user             User             @relation("LoaEmployee", fields: [userId], references: [id], onDelete: Cascade)
+  userId           Int
+  employmentStatus EmploymentStatus // status yang dinyatakan dalam LoA
+  acceptanceDate   DateTime         @db.Date
+  generatedBy      User             @relation("LoaGenerator", fields: [generatedById], references: [id])
+  generatedById    Int
+  signature        String           @db.LongText // data URL PNG
+  createdAt        DateTime         @default(now())
+
+  @@index([userId])
+}
+
+enum ContractExtensionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Pengajuan perpanjangan kontrak/magang oleh karyawan ybs, disetujui/ditolak oleh HR/CEO
+// (pola sama persis dengan LeaveRequest).
+model ContractExtensionRequest {
+  id               Int                     @id @default(autoincrement())
+  user             User                    @relation("ExtensionRequester", fields: [userId], references: [id], onDelete: Cascade)
+  userId           Int
+  currentEndDate   DateTime                @db.Date
+  requestedEndDate DateTime                @db.Date
+  reason           String                  @db.Text
+  status           ContractExtensionStatus @default(PENDING)
+  reviewedBy       User?                   @relation("ExtensionReviewer", fields: [reviewedById], references: [id])
+  reviewedById     Int?
+  reviewedAt       DateTime?
+  reviewNote       String?                 @db.Text
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

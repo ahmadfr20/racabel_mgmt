@@ -17,6 +17,8 @@ export const GET = handle(async () => {
       description: m.description,
       weight: m.weight,
       active: m.active,
+      isAuto: m.isAuto,
+      autoSource: m.autoSource,
       userId: m.userId,
       assignedUserName: m.assignedUser?.fullName ?? null,
     }))

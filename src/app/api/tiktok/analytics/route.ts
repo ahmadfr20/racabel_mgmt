@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchSalesAnalytics, isConnected, tiktokConfigured } from "@/lib/tiktok";
+import { handle } from "@/lib/api";
+import { requirePermission } from "@/lib/auth";
 
 type TrendPoint = { date: string; revenue: number; orders: number };
 type Product = { name: string; sold: number; revenue: number; views: number; conversionRate: number };
@@ -61,7 +63,8 @@ function generateMockData(from: Date, to: Date): AnalyticsResponse {
   };
 }
 
-export async function GET(req: NextRequest) {
+export const GET = handle(async (req: NextRequest) => {
+  await requirePermission("marketplace.view");
   const { searchParams } = new URL(req.url);
 
   const toDate   = searchParams.get("to")   ? new Date(searchParams.get("to")!)   : new Date();
@@ -78,4 +81,4 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(generateMockData(fromDate, toDate));
-}
+});

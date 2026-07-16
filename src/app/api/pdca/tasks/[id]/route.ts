@@ -31,6 +31,15 @@ export const PATCH = handle(async (req: NextRequest, ctx: { params: Promise<{ id
     }
   }
 
+  if (data.userId !== undefined) {
+    const week = await prisma.pdcaWeek.findUnique({ where: { id: task.weekId } });
+    const pic = await prisma.user.findUnique({ where: { id: data.userId }, select: { departmentId: true } });
+    if (!pic) throw new AuthError("PIC tidak ditemukan", 400);
+    if (!week || pic.departmentId !== week.departmentId) {
+      throw new AuthError("PIC harus berasal dari department minggu ini.", 400);
+    }
+  }
+
   await prisma.pdcaTask.update({
     where: { id },
     data: {

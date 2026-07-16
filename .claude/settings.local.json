@@ -40,7 +40,11 @@
       "Bash(Select-String -Pattern \"error\" -CaseSensitive)",
       "Bash(Select-Object -First 10)",
       "Bash(\\\\.md\")",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "Bash(npx prisma *)",
+      "Bash(npm run *)",
+      "Bash(ssh -i ~/.ssh/hrapp_deploy root@202.10.41.199 \"cd /var/www/racabel_mgmt && npm run db:seed 2>&1 | tail -20\")",
+      "Bash(npx tsx *)"
     ]
   }
 }

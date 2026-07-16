@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Gauge, Pencil, Plus, SlidersHorizontal, Trash2, Wallet } from "lucide-react";
+import { Gauge, Lock, Pencil, Plus, SlidersHorizontal, Trash2, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Card, PageHeader, StatCard } from "@/components/ui";
@@ -12,7 +12,14 @@ interface PayrollRow {
   baseSalary: number; performanceAllowance: number; score: number;
   performanceAmount: number; totalSalary: number;
 }
-interface Kpi { id: number; name: string; description: string | null; weight: number; active: boolean; userId: number | null; assignedUserName: string | null }
+const AUTO_SOURCE_LABEL: Record<string, string> = {
+  TASKLOG: "Task Log", PDCA: "PDCA", TICKET: "Tiket", ATTENDANCE: "Absensi",
+};
+
+interface Kpi {
+  id: number; name: string; description: string | null; weight: number; active: boolean;
+  isAuto: boolean; autoSource: string | null; userId: number | null; assignedUserName: string | null;
+}
 interface KpiPerson { id: number; fullName: string }
 
 function periodOptions() {
@@ -134,7 +141,7 @@ export function PayrollClient({ canManage }: { canManage: boolean }) {
 
 // ===== Modal input nilai KPI per karyawan =====
 function ScoreModal({ user, period, onClose, onSaved }: { user: PayrollRow; period: string; onClose: () => void; onSaved: () => void }) {
-  const [metrics, setMetrics] = useState<{ id: number; name: string; weight: number; score: number }[]>([]);
+  const [metrics, setMetrics] = useState<{ id: number; name: string; weight: number; score: number; isAuto: boolean; autoSource: string | null }[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -147,9 +154,10 @@ function ScoreModal({ user, period, onClose, onSaved }: { user: PayrollRow; peri
   async function save() {
     setSaving(true);
     try {
+      const manual = metrics.filter((m) => !m.isAuto);
       await apiFetch("/api/performance", {
         method: "PUT",
-        body: JSON.stringify({ userId: user.userId, period, scores: metrics.map((m) => ({ metricId: m.id, score: m.score })) }),
+        body: JSON.stringify({ userId: user.userId, period, scores: manual.map((m) => ({ metricId: m.id, score: m.score })) }),
       });
       onSaved();
     } catch (err) {
@@ -161,25 +169,41 @@ function ScoreModal({ user, period, onClose, onSaved }: { user: PayrollRow; peri
   return (
     <Modal open onClose={onClose} title={`Input Capaian — ${user.fullName}`}>
       <div className="space-y-4">
-        <p className="text-sm text-slate-500">Periode {period}. Masukkan capaian tiap KPI (0–100).</p>
+        <p className="text-sm text-slate-500">Periode {period}. Masukkan capaian tiap KPI manual (0–100); KPI otomatis dihitung dari data sistem.</p>
         {metrics.map((m, i) => (
           <div key={m.id}>
             <div className="mb-1 flex items-center justify-between text-sm">
-              <span className="font-medium text-slate-700">{m.name}</span>
+              <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                {m.name}
+                {m.isAuto && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-500" title={`Otomatis berdasarkan ${AUTO_SOURCE_LABEL[m.autoSource ?? ""] ?? m.autoSource} bulan ini`}>
+                    <Lock className="h-2.5 w-2.5" /> Otomatis
+                  </span>
+                )}
+              </span>
               <span className="text-xs text-slate-400">bobot {m.weight}%</span>
             </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="range" min={0} max={100} value={m.score}
-                onChange={(e) => setMetrics((arr) => arr.map((x, j) => (j === i ? { ...x, score: Number(e.target.value) } : x)))}
-                className="flex-1 accent-brand-600"
-              />
-              <input
-                type="number" min={0} max={100} value={m.score}
-                onChange={(e) => setMetrics((arr) => arr.map((x, j) => (j === i ? { ...x, score: Math.min(100, Math.max(0, Number(e.target.value))) } : x)))}
-                className="input !w-20 !py-1.5 text-center"
-              />
-            </div>
+            {m.isAuto ? (
+              <div className="flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-slate-400" style={{ width: `${m.score}%` }} />
+                </div>
+                <span className="w-14 text-right text-sm font-medium text-slate-600">{m.score}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <input
+                  type="range" min={0} max={100} value={m.score}
+                  onChange={(e) => setMetrics((arr) => arr.map((x, j) => (j === i ? { ...x, score: Number(e.target.value) } : x)))}
+                  className="flex-1 accent-brand-600"
+                />
+                <input
+                  type="number" min={0} max={100} value={m.score}
+                  onChange={(e) => setMetrics((arr) => arr.map((x, j) => (j === i ? { ...x, score: Math.min(100, Math.max(0, Number(e.target.value))) } : x)))}
+                  className="input !w-20 !py-1.5 text-center"
+                />
+              </div>
+            )}
           </div>
         ))}
         <div className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3">
@@ -286,6 +310,11 @@ function KpiPanel() {
                   <span className={cn("badge", k.userId ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300")}>
                     {k.assignedUserName ? `Khusus: ${k.assignedUserName}` : "Umum"}
                   </span>
+                  {k.isAuto && (
+                    <span className="badge inline-flex items-center gap-1 bg-amber-50 text-amber-700" title={`Skor dihitung otomatis dari ${AUTO_SOURCE_LABEL[k.autoSource ?? ""] ?? k.autoSource}`}>
+                      <Lock className="h-3 w-3" /> Otomatis
+                    </span>
+                  )}
                   {!k.active && <span className="badge bg-slate-100 text-slate-500">Nonaktif</span>}
                 </div>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-400">{k.description || "—"}</p>
@@ -295,8 +324,12 @@ function KpiPanel() {
                   <p className="text-lg font-bold text-brand-700 dark:text-brand-400">{k.weight}%</p>
                   <p className="text-xs text-slate-400">bobot</p>
                 </div>
-                <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600" onClick={() => openEdit(k)}><Pencil className="h-4 w-4" /></button>
-                <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600" onClick={() => remove(k)}><Trash2 className="h-4 w-4" /></button>
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600" onClick={() => openEdit(k)} title={k.isAuto ? "Ubah bobot / status aktif" : "Ubah"}><Pencil className="h-4 w-4" /></button>
+                {k.isAuto ? (
+                  <span className="rounded-lg p-2 text-slate-200 dark:text-slate-700" title="Metrik otomatis tidak dapat dihapus"><Trash2 className="h-4 w-4" /></span>
+                ) : (
+                  <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600" onClick={() => remove(k)}><Trash2 className="h-4 w-4" /></button>
+                )}
               </div>
             </div>
           </Card>
@@ -305,13 +338,18 @@ function KpiPanel() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Ubah KPI" : "Tambah KPI"}>
         <form onSubmit={submit} className="space-y-4">
+          {editing?.isAuto && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <Lock className="h-3.5 w-3.5" /> Metrik otomatis — nama & deskripsi terkunci, hanya bobot & status aktif yang dapat diubah.
+            </div>
+          )}
           <div>
             <label className="label">Nama KPI *</label>
-            <input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+            <input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} disabled={!!editing?.isAuto} required />
           </div>
           <div>
             <label className="label">Deskripsi</label>
-            <input className="input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+            <input className="input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} disabled={!!editing?.isAuto} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

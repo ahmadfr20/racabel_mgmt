@@ -6,7 +6,8 @@ export default async function AttendancePage() {
   const user = (await getCurrentUser())!;
   const canCheckin = can(user, "attendance.checkin");
   const canViewAll = can(user, "attendance.view_all");
+  const canManage = can(user, "attendance.manage");
   if (!canCheckin && !canViewAll) redirect("/dashboard");
 
-  return <AttendanceClient canCheckin={canCheckin} canViewAll={canViewAll} />;
+  return <AttendanceClient canCheckin={canCheckin} canViewAll={canViewAll} canManage={canManage} />;
 }

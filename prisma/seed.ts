@@ -40,6 +40,11 @@ const PERMISSIONS: { key: string; label: string; group: string }[] = [
   { key: "financial.upload", label: "Impor File Keuangan (AI)", group: "Keuangan" },
 
   { key: "assistant.use", label: "Gunakan Asisten AI (Chatbot)", group: "Asisten AI" },
+
+  { key: "attendance.manage", label: "Hapus Data Absensi", group: "Absensi" },
+  { key: "marketplace.view", label: "Lihat Analitik Marketplace (TikTok/Tokopedia/Shopee)", group: "Marketplace" },
+
+  { key: "contract.manage", label: "Kelola Kontrak, LoA, & Persetujuan Perpanjangan", group: "Kontrak" },
 ];
 
 // Role bawaan + authority default-nya
@@ -57,6 +62,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "tickets.create", "tickets.view_all", "tickets.manage",
     "financial.view", "financial.upload",
     "assistant.use",
+    "contract.manage",
   ],
   CEO: [
     "dashboard.view",
@@ -69,6 +75,9 @@ const ROLE_PERMISSIONS: Record<string, string[] | "ALL"> = {
     "tickets.view_all",
     "financial.view",
     "assistant.use",
+    "attendance.manage",
+    "marketplace.view",
+    "contract.manage",
   ],
   Karyawan: [
     "dashboard.view",
@@ -150,6 +159,38 @@ async function main() {
   ];
   if ((await prisma.kpiMetric.count()) === 0) {
     await prisma.kpiMetric.createMany({ data: metrics });
+  }
+
+  // 5b. Migrasi KPI ke skema otomatis (idempotent, selalu dijalankan):
+  // Kedisiplinan diganti jadi otomatis (dari data absensi), + 3 KPI otomatis baru
+  // (Task Log, PDCA, Tiket). Produktivitas/Kualitas Kerja/Kerjasama Tim tetap manual.
+  const autoMigration: {
+    name: string;
+    description: string;
+    weight: number;
+    isAuto: boolean;
+    autoSource: "TASKLOG" | "PDCA" | "TICKET" | "ATTENDANCE" | null;
+  }[] = [
+    { name: "Produktivitas", description: "Pencapaian target output", weight: 25, isAuto: false, autoSource: null },
+    { name: "Kualitas Kerja", description: "Akurasi & minim kesalahan", weight: 20, isAuto: false, autoSource: null },
+    { name: "Kerjasama Tim", description: "Kolaborasi & komunikasi", weight: 10, isAuto: false, autoSource: null },
+    { name: "Kedisiplinan", description: "Otomatis dari ketepatan jam masuk & pulang (Absensi)", weight: 20, isAuto: true, autoSource: "ATTENDANCE" },
+    { name: "Task Log", description: "Otomatis dari persentase Task Log yang diselesaikan", weight: 15, isAuto: true, autoSource: "TASKLOG" },
+    { name: "PDCA", description: "Otomatis dari persentase task PDCA yang diselesaikan", weight: 5, isAuto: true, autoSource: "PDCA" },
+    { name: "Tiket", description: "Otomatis dari persentase tiket yang diselesaikan (PIC)", weight: 5, isAuto: true, autoSource: "TICKET" },
+  ];
+  for (const m of autoMigration) {
+    const existing = await prisma.kpiMetric.findFirst({ where: { name: m.name, userId: null } });
+    if (existing) {
+      await prisma.kpiMetric.update({
+        where: { id: existing.id },
+        data: { description: m.description, weight: m.weight, isAuto: m.isAuto, autoSource: m.autoSource },
+      });
+    } else {
+      await prisma.kpiMetric.create({
+        data: { name: m.name, description: m.description, weight: m.weight, isAuto: m.isAuto, autoSource: m.autoSource },
+      });
+    }
   }
 
   // 6. Akun admin awal

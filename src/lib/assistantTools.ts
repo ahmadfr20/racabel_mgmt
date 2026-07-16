@@ -48,11 +48,14 @@ const listEmployees: AssistantTool = {
         isActive: true,
         ...(query ? { OR: [{ fullName: { contains: query } }, { username: { contains: query } }] } : {}),
       },
-      include: { role: { select: { name: true } }, department: { select: { name: true } } },
+      include: { role: { select: { name: true } }, department: { select: { id: true, name: true } } },
       take: 200,
       orderBy: { fullName: "asc" },
     });
-    return ok(users.map((u) => ({ id: u.id, fullName: u.fullName, role: u.role.name, department: u.department?.name ?? null })));
+    return ok(users.map((u) => ({
+      id: u.id, fullName: u.fullName, role: u.role.name,
+      departmentId: u.department?.id ?? null, department: u.department?.name ?? null,
+    })));
   },
 };
 
@@ -131,12 +134,18 @@ const listTaskLogs: AssistantTool = {
 const listPdcaWeeks: AssistantTool = {
   name: "list_pdca_weeks",
   description:
-    "Lihat daftar minggu PDCA beserta task di dalamnya (judul, PIC, status selesai/belum). Gunakan untuk konteks atau menemukan id minggu/task sebelum menambah/mengubah.",
+    "Lihat daftar minggu PDCA beserta task di dalamnya (judul, department minggu, PIC, status selesai/belum). Gunakan untuk konteks atau menemukan id minggu/task sebelum menambah/mengubah.",
   input_schema: { type: "object", properties: {} },
   available: (u) => u.permissions.includes("pdca.view") || u.permissions.includes("pdca.manage"),
   run: async () => {
     const weeks = await prisma.pdcaWeek.findMany({
-      include: { tasks: { include: { user: { select: { fullName: true } } }, orderBy: [{ order: "asc" }, { id: "asc" }] } },
+      include: {
+        department: { select: { id: true, name: true } },
+        tasks: {
+          include: { user: { select: { fullName: true } } },
+          orderBy: [{ order: "asc" }, { id: "asc" }],
+        },
+      },
       orderBy: [{ startDate: "asc" }, { id: "asc" }],
       take: 30,
     });
@@ -146,6 +155,8 @@ const listPdcaWeeks: AssistantTool = {
         title: w.title,
         startDate: w.startDate,
         endDate: w.endDate,
+        departmentId: w.department.id,
+        department: w.department.name,
         tasks: w.tasks.map((t) => ({ taskId: t.id, title: t.title, status: t.status, pic: t.user.fullName, picUserId: t.userId })),
       }))
     );
@@ -156,23 +167,33 @@ const listPdcaWeeks: AssistantTool = {
 const createPdcaWeek: AssistantTool = {
   name: "create_pdca_week",
   description:
-    "Buat minggu PDCA baru (mis. \"Week 1\") dengan periode tanggal opsional, sebagai wadah untuk task-task di minggu tersebut. Setelah dibuat, tambahkan task dengan add_pdca_task.",
+    "Buat minggu PDCA baru (mis. \"Week 1\") untuk SATU department tertentu, dengan periode tanggal opsional, sebagai wadah untuk task-task di minggu tersebut. Setiap minggu PDCA khusus untuk satu department — task & PIC di dalamnya harus dari department yang sama. Gunakan list_employees untuk melihat departmentId tiap orang (semua orang di department yang sama berbagi departmentId yang sama). Setelah dibuat, tambahkan task dengan add_pdca_task.",
   input_schema: {
     type: "object",
     properties: {
       title: { type: "string", description: "Judul minggu, mis. \"Week 1\"" },
+      departmentId: { type: "number", description: "Id department pemilik minggu PDCA ini (wajib)" },
       startDate: { type: "string", description: "Tanggal mulai periode YYYY-MM-DD (opsional)" },
       endDate: { type: "string", description: "Tanggal akhir periode YYYY-MM-DD (opsional)" },
     },
-    required: ["title"],
+    required: ["title", "departmentId"],
   },
   available: (u) => u.permissions.includes("pdca.manage"),
   run: async (input) => {
-    const d = z.object({ title: z.string().min(1), startDate: z.string().optional(), endDate: z.string().optional() }).parse(input);
+    const d = z
+      .object({
+        title: z.string().min(1),
+        departmentId: z.number().int().positive(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      })
+      .parse(input);
+    const department = await prisma.department.findUnique({ where: { id: d.departmentId } });
+    if (!department) return err(`Department id ${d.departmentId} tidak ditemukan`);
     const week = await prisma.pdcaWeek.create({
-      data: { title: d.title, startDate: parseDate(d.startDate), endDate: parseDate(d.endDate) },
+      data: { title: d.title, departmentId: d.departmentId, startDate: parseDate(d.startDate), endDate: parseDate(d.endDate) },
     });
-    return ok({ weekId: week.id, message: "Minggu PDCA dibuat", title: week.title });
+    return ok({ weekId: week.id, message: "Minggu PDCA dibuat", title: week.title, department: department.name });
   },
 };
 
@@ -180,13 +201,13 @@ const createPdcaWeek: AssistantTool = {
 const addPdcaTask: AssistantTool = {
   name: "add_pdca_task",
   description:
-    "Tambahkan task/checklist item ke sebuah minggu PDCA (gunakan list_pdca_weeks untuk menemukan weekId, dan list_employees untuk menemukan id PIC bila bukan diri sendiri).",
+    "Tambahkan task/checklist item ke sebuah minggu PDCA (gunakan list_pdca_weeks untuk menemukan weekId, dan list_employees untuk menemukan id PIC bila bukan diri sendiri). PIC WAJIB berasal dari department yang sama dengan minggu tsb — tool akan menolak bila tidak sesuai.",
   input_schema: {
     type: "object",
     properties: {
       weekId: { type: "number", description: "Id minggu PDCA tujuan" },
       title: { type: "string", description: "Judul task" },
-      userId: { type: "number", description: "Id PIC (penanggung jawab); default diri sendiri bila tidak diisi" },
+      userId: { type: "number", description: "Id PIC (penanggung jawab); default diri sendiri bila tidak diisi. Harus berasal dari department minggu ini." },
       status: { type: "string", enum: ["BELUM_SELESAI", "SELESAI"], description: "Default BELUM_SELESAI" },
     },
     required: ["weekId", "title"],
@@ -203,9 +224,15 @@ const addPdcaTask: AssistantTool = {
       .parse(input);
     const week = await prisma.pdcaWeek.findUnique({ where: { id: d.weekId } });
     if (!week) return err(`Minggu PDCA id ${d.weekId} tidak ditemukan`);
+    const picUserId = d.userId ?? user.id;
+    const pic = await prisma.user.findUnique({ where: { id: picUserId }, select: { departmentId: true } });
+    if (!pic) return err(`PIC id ${picUserId} tidak ditemukan`);
+    if (pic.departmentId !== week.departmentId) {
+      return err("PIC harus berasal dari department minggu ini. Cek department PIC via list_employees.");
+    }
     const count = await prisma.pdcaTask.count({ where: { weekId: d.weekId } });
     const task = await prisma.pdcaTask.create({
-      data: { weekId: d.weekId, title: d.title, userId: d.userId ?? user.id, status: d.status, order: count },
+      data: { weekId: d.weekId, title: d.title, userId: picUserId, status: d.status, order: count },
     });
     return ok({ taskId: task.id, message: "Task ditambahkan", title: task.title, week: week.title });
   },
@@ -355,12 +382,3 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
   getPerformanceSummary,
   setPerformanceScore,
 ];
-
-// Ekspos hanya tool yang boleh dipakai pengguna, dalam format yang diminta Anthropic SDK.
-export function toolsForUser(user: CurrentUser): { defs: Anthropic.Tool[]; map: Map<string, AssistantTool> } {
-  const available = ASSISTANT_TOOLS.filter((t) => t.available(user));
-  return {
-    defs: available.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
-    map: new Map(available.map((t) => [t.name, t])),
-  };
-}

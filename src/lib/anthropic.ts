@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { CurrentUser } from "./auth";
 import { currentPeriod } from "./performance";
-import { toolsForUser, ASSISTANT_TOOLS } from "./assistantTools";
+import { ASSISTANT_TOOLS } from "./assistantTools";
 import { financialToolsForUser, FINANCIAL_ASSISTANT_TOOLS } from "./financialAssistantTools";
 import { CPAS_ASSISTANT_TOOLS } from "./cpasAssistantTools";
 import { SOP_ASSISTANT_TOOLS } from "./sopAssistantTools";
@@ -156,90 +156,7 @@ export interface ChatMessage {
   content: string;
 }
 
-function buildSystemPrompt(user: CurrentUser, toolNames: string[]): string {
-  const today = new Date().toISOString().slice(0, 10);
-  return `Anda adalah Asisten AI internal pada aplikasi "Racabel HQ Management" (sistem HR & operasional perusahaan). Anda TIDAK hanya menjawab — Anda dapat MELAKUKAN aksi di aplikasi melalui tools yang tersedia.
-
-Konteks pengguna saat ini:
-- Nama: ${user.fullName} (id: ${user.id})
-- Role: ${user.role.name}${user.department ? ` · Department: ${user.department.name}` : ""}
-- Tanggal hari ini: ${today}
-- Periode kinerja berjalan: ${currentPeriod()}
-
-Kemampuan Anda (tergantung hak akses pengguna). Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya bisa menjelaskan konsep)"}.
-Secara umum Anda dapat: mencatat Task Log harian, mengelola PDCA (checklist mingguan: buat "Week" dengan periode tanggal, tambahkan task berisi judul + PIC ke dalamnya, dan tandai task selesai/belum), serta mencatat/menghitung kinerja (skor KPI berbobot dan estimasi tunjangan/gaji).
-
-Format PDCA sekarang SEDERHANA (bukan lagi tahapan Plan-Do-Check-Act per item): satu "minggu" (mis. "Week 1", dengan periode tanggal opsional) berisi daftar task, tiap task punya judul, satu PIC (penanggung jawab), dan status Selesai/Belum Selesai. Alur biasa: create_pdca_week dulu (atau pakai list_pdca_weeks untuk minggu yang sudah ada), lalu add_pdca_task untuk tiap task, lalu update_pdca_task_status untuk menandai kemajuan.
-
-Pedoman:
-- Gunakan tools untuk benar-benar membuat/mengubah data ketika pengguna memintanya (mis. "catat task log saya hari ini: ...", "buatkan PDCA Week 1 dengan task ...", "nilai kinerja Budi bulan ini: produktivitas 85, ..."). Jangan hanya menjelaskan cara manualnya jika Anda bisa melakukannya.
-- Untuk menugaskan PIC pada task PDCA atau mencatat kinerja karyawan LAIN, cari id-nya dulu dengan list_employees. Untuk skor kinerja, ambil id metrik dengan list_kpi_metrics terlebih dahulu.
-- Bila informasi kurang (mis. judul task log belum jelas), tanyakan singkat sebelum bertindak. Jangan mengarang nilai.
-- Skor kinerja MEMENGARUHI tunjangan & gaji — untuk perubahan kinerja, tegaskan ringkas apa yang akan/ sudah Anda catat, lalu tampilkan skor berbobot terbaru.
-- Setelah melakukan aksi, konfirmasikan dengan ringkas & spesifik (mis. sebutkan judul, tanggal, atau id yang dibuat).
-- Jika tool mengembalikan error, jelaskan masalahnya ke pengguna dengan bahasa yang mudah.
-- Jawab dalam Bahasa Indonesia, singkat, jelas, dan praktis. Anda bukan pembuat keputusan final — Anda alat bantu.`;
-}
-
 const MAX_TOOL_ITERATIONS = 6;
-
-export async function sendAssistantChat(messages: ChatMessage[], user: CurrentUser): Promise<string> {
-  const anthropic = getClient();
-  const { defs, map } = toolsForUser(user);
-  const system = buildSystemPrompt(user, [...map.keys()]);
-
-  const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
-
-  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 4096,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      system,
-      tools: defs,
-      messages: convo,
-    });
-
-    if (response.stop_reason === "refusal") {
-      return "Maaf, saya tidak dapat membantu permintaan ini karena kebijakan keamanan.";
-    }
-
-    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-
-    if (toolUses.length === 0) {
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
-      return text || "Maaf, terjadi kesalahan saat menghasilkan balasan. Coba lagi.";
-    }
-
-    // Simpan giliran asisten (termasuk blok thinking & tool_use) apa adanya.
-    convo.push({ role: "assistant", content: response.content });
-
-    // Jalankan semua tool yang diminta, kembalikan seluruh hasil dalam SATU pesan user.
-    const results: Anthropic.ToolResultBlockParam[] = [];
-    for (const tu of toolUses) {
-      const tool = map.get(tu.name);
-      let res;
-      if (!tool) {
-        res = { content: JSON.stringify({ error: `Tool ${tu.name} tidak tersedia` }), isError: true };
-      } else {
-        try {
-          res = await tool.run(tu.input, user);
-        } catch (e) {
-          res = { content: JSON.stringify({ error: e instanceof Error ? e.message : "Gagal menjalankan aksi" }), isError: true };
-        }
-      }
-      results.push({ type: "tool_result", tool_use_id: tu.id, content: res.content, is_error: res.isError });
-    }
-    convo.push({ role: "user", content: results });
-  }
-
-  return "Maaf, permintaan ini terlalu kompleks untuk saya selesaikan sekarang. Coba pecah menjadi langkah yang lebih kecil.";
-}
 
 // ============ AI Assistant universal (gabungan semua tool) ============
 
@@ -271,7 +188,7 @@ Konteks pengguna saat ini:
 Tools yang tersedia untuk pengguna ini: ${toolNames.length ? toolNames.join(", ") : "(tidak ada — hanya akses lihat terbatas)"}.
 
 Kemampuan Anda:
-1. **Keuangan**: Lihat riwayat impor, hitung total/komparasi, simpan transaksi baru, simpan komparasi. Bila ada file atau gambar terlampir (Excel/CSV/PDF/struk/nota), baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, nominal).
+1. **Keuangan**: Lihat riwayat impor, hitung total/komparasi, simpan transaksi baru, simpan komparasi. Bila ada file atau gambar terlampir (Excel/CSV/PDF/struk/nota), baca dan identifikasi transaksinya (tanggal, deskripsi, kategori, nominal). Setiap data keuangan yang disimpan (save_transactions/save_financial_comparison) punya visibilitas: PRIVATE (default — hanya pengguna ini sendiri yang bisa melihatnya) atau EVERYONE (semua pengguna yang punya akses lihat keuangan). Gunakan PRIVATE kecuali pengguna secara eksplisit minta datanya bisa dilihat/dibagikan ke semua orang. Setelah menyimpan, sebutkan singkat visibilitasnya (mis. "tersimpan sebagai privat — hanya Anda yang bisa melihatnya").
 2. **PDCA**: Buat minggu PDCA (create_pdca_week), tambah task dengan PIC (add_pdca_task), tandai status (update_pdca_task_status). Format sederhana: satu minggu berisi daftar task dengan judul + PIC + status.
 3. **Task Log**: Catat aktivitas harian (create_task_log), lihat rekap (list_task_logs).
 4. **Kinerja & Gaji**: Lihat metrik KPI (list_kpi_metrics), hitung estimasi gaji (get_performance_summary), catat skor kinerja (set_performance_score). PERHATIAN: skor memengaruhi tunjangan & gaji.

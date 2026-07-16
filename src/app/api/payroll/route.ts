@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handle, ok } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
-import { computeSalary, currentPeriod, getWeightedScore } from "@/lib/performance";
+import { computeSalary, currentPeriod, getWeightedScore, syncAutoPerformanceRecords } from "@/lib/performance";
 
 // GET /api/payroll?period=YYYY-MM — daftar gaji terkalkulasi semua karyawan aktif.
 export const GET = handle(async (req: NextRequest) => {
@@ -17,6 +17,7 @@ export const GET = handle(async (req: NextRequest) => {
 
   const rows = await Promise.all(
     users.map(async (u) => {
+      await syncAutoPerformanceRecords(u.id, period);
       const score = await getWeightedScore(u.id, period);
       const salary = computeSalary({ baseSalary: u.baseSalary, performanceAllowance: u.performanceAllowance, score });
       return {

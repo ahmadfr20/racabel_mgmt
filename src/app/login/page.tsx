@@ -194,11 +194,9 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl bg-slate-50 p-4 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            <p className="font-medium text-slate-600 dark:text-slate-300">Akun demo:</p>
-            <p className="mt-1">admin / admin123 &nbsp;·&nbsp; hr / password123 &nbsp;·&nbsp; budi / password123</p>
-            <p className="mt-2 text-slate-400 dark:text-slate-500">Registrasi hanya dapat dilakukan oleh Admin dari dalam aplikasi.</p>
-          </div>
+          <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            Registrasi hanya dapat dilakukan oleh Admin dari dalam aplikasi.
+          </p>
         </div>
       </div>
     </div>

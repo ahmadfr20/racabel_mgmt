@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeAuthCode } from "@/lib/tiktok";
+import { getCurrentUser, can } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // Callback dari TikTok setelah seller menyetujui otorisasi.
 // TikTok mengirim `code` (auth_code) yang ditukar jadi access + refresh token.
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!can(user, "marketplace.view")) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code") || searchParams.get("auth_code");
   const redirect = new URL("/tiktok", req.url);

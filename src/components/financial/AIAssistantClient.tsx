@@ -3,20 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   FileSpreadsheet, GitCompareArrows, Loader2, TrendingDown, TrendingUp, Trash2, Wallet,
-  FileText, BookOpen,
+  FileText, BookOpen, Lock, Globe, FileDown,
 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { Card, PageHeader, StatCard, EmptyState } from "@/components/ui";
 import { AIAssistantChat } from "@/components/financial/AIAssistantChat";
+import { downloadExcel, downloadPdfTable, downloadPdfDocument } from "@/lib/exportFile";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+type Visibility = "PRIVATE" | "EVERYONE";
 
 interface ImportSummary {
   id: number; fileName: string; status: "PROCESSING" | "COMPLETED" | "FAILED";
   currency: string; totalIncome: number; totalExpense: number;
   aiNotes: string | null; errorMessage: string | null;
   transactionCount: number; uploadedByName: string; createdAt: string;
+  visibility: Visibility; isOwner: boolean;
 }
 
 interface Transaction {
@@ -29,12 +33,14 @@ interface ImportDetail {
   currency: string; totalIncome: number; totalExpense: number;
   aiNotes: string | null; errorMessage: string | null; createdAt: string;
   uploadedBy: { fullName: string }; transactions: Transaction[];
+  visibility: Visibility; isOwner: boolean;
 }
 
 interface Comparison {
   id: number; title: string; scopeALabel: string; scopeBLabel: string;
   totalIncomeA: number; totalExpenseA: number; totalIncomeB: number; totalExpenseB: number;
   analysis: string; createdByName: string; createdAt: string;
+  visibility: Visibility; isOwner: boolean;
 }
 
 interface CpasPlan {
@@ -115,6 +121,19 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
     await loadComparisons();
   }
 
+  async function toggleImportVisibility(h: { id: number; visibility: Visibility }) {
+    const next: Visibility = h.visibility === "PRIVATE" ? "EVERYONE" : "PRIVATE";
+    await apiFetch(`/api/financial/import/${h.id}`, { method: "PATCH", body: JSON.stringify({ visibility: next }) });
+    await loadHistory();
+    if (selected?.id === h.id) await openDetail(h.id);
+  }
+
+  async function toggleComparisonVisibility(c: { id: number; visibility: Visibility }) {
+    const next: Visibility = c.visibility === "PRIVATE" ? "EVERYONE" : "PRIVATE";
+    await apiFetch(`/api/financial/comparisons/${c.id}`, { method: "PATCH", body: JSON.stringify({ visibility: next }) });
+    await loadComparisons();
+  }
+
   async function removeCpas(id: number) {
     if (!confirm("Hapus CPAS Plan ini?")) return;
     await apiFetch(`/api/cpas/${id}`, { method: "DELETE" });
@@ -139,6 +158,102 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
     loadSop();
   }
 
+  // ── Ekspor Excel/PDF ──────────────────────────────────────────────────────
+
+  function exportImportHistory(fmt: "excel" | "pdf") {
+    const visLabel = (v: Visibility) => (v === "PRIVATE" ? "Privat" : "Semua orang");
+    if (fmt === "excel") {
+      downloadExcel("riwayat-impor-keuangan", [{
+        name: "Riwayat Impor",
+        rows: history.map((h) => ({
+          File: h.fileName, Status: h.status, Visibilitas: visLabel(h.visibility),
+          Transaksi: h.transactionCount, Pemasukan: h.totalIncome, Pengeluaran: h.totalExpense,
+          "Diunggah oleh": h.uploadedByName, Tanggal: formatDate(h.createdAt, true),
+        })),
+      }]);
+    } else {
+      downloadPdfTable({
+        filename: "riwayat-impor-keuangan",
+        title: "Riwayat Impor Keuangan",
+        head: ["File", "Status", "Visibilitas", "Transaksi", "Pemasukan", "Pengeluaran", "Diunggah oleh", "Tanggal"],
+        body: history.map((h) => [
+          h.fileName, h.status, visLabel(h.visibility), h.transactionCount,
+          formatCurrency(h.totalIncome), formatCurrency(h.totalExpense), h.uploadedByName, formatDate(h.createdAt, true),
+        ]),
+      });
+    }
+  }
+
+  function exportImportDetail(detail: ImportDetail, fmt: "excel" | "pdf") {
+    const fname = `hasil-ekstraksi-${detail.fileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+    if (fmt === "excel") {
+      downloadExcel(fname, [{
+        name: "Transaksi",
+        rows: detail.transactions.map((t) => ({
+          Tanggal: formatDate(t.date), Deskripsi: t.description, Kategori: t.category,
+          Jenis: t.type === "INCOME" ? "Pemasukan" : "Pengeluaran", Nominal: t.amount, Catatan: t.notes ?? "",
+        })),
+      }]);
+    } else {
+      downloadPdfTable({
+        filename: fname,
+        title: `Hasil Ekstraksi — ${detail.fileName}`,
+        subtitle: `Total Pemasukan ${formatCurrency(detail.totalIncome)} · Total Pengeluaran ${formatCurrency(detail.totalExpense)}`,
+        head: ["Tanggal", "Deskripsi", "Kategori", "Jenis", "Nominal", "Catatan"],
+        body: detail.transactions.map((t) => [
+          formatDate(t.date), t.description, t.category, t.type === "INCOME" ? "Pemasukan" : "Pengeluaran",
+          formatCurrency(t.amount), t.notes ?? "",
+        ]),
+      });
+    }
+  }
+
+  function exportComparisons(fmt: "excel" | "pdf") {
+    if (fmt === "excel") {
+      downloadExcel("riwayat-komparasi-keuangan", [{
+        name: "Komparasi",
+        rows: comparisons.map((c) => ({
+          Judul: c.title,
+          "Ruang Lingkup A": c.scopeALabel, "Pemasukan A": c.totalIncomeA, "Pengeluaran A": c.totalExpenseA, "Net A": c.totalIncomeA - c.totalExpenseA,
+          "Ruang Lingkup B": c.scopeBLabel, "Pemasukan B": c.totalIncomeB, "Pengeluaran B": c.totalExpenseB, "Net B": c.totalIncomeB - c.totalExpenseB,
+          Analisis: c.analysis, "Dibuat oleh": c.createdByName, Tanggal: formatDate(c.createdAt, true),
+        })),
+      }]);
+    } else {
+      downloadPdfTable({
+        filename: "riwayat-komparasi-keuangan",
+        title: "Riwayat Komparasi Keuangan",
+        head: ["Judul", "Lingkup A", "Net A", "Lingkup B", "Net B", "Analisis", "Dibuat oleh", "Tanggal"],
+        body: comparisons.map((c) => [
+          c.title, c.scopeALabel, formatCurrency(c.totalIncomeA - c.totalExpenseA),
+          c.scopeBLabel, formatCurrency(c.totalIncomeB - c.totalExpenseB),
+          c.analysis, c.createdByName, formatDate(c.createdAt, true),
+        ]),
+      });
+    }
+  }
+
+  function exportCpasPdf() {
+    downloadPdfDocument("cpas-plans", "CPAS Plans Afiliasi", cpasList.map((c) => ({
+      title: c.title,
+      meta: `${c.period} · oleh ${c.createdByName}${c.picName ? ` · PIC: ${c.picName}` : ""} · ${formatDate(c.createdAt, true)}`,
+      blocks: [
+        { label: "Content", text: c.content },
+        { label: "Promo", text: c.promo },
+        { label: "Audience", text: c.audience },
+        { label: "Strategy", text: c.strategy },
+      ],
+    })));
+  }
+
+  function exportSopPdf() {
+    downloadPdfDocument("sop-plans", "SOP Plans Afiliasi", sopList.map((s) => ({
+      title: s.title,
+      meta: `${s.department}${s.picName ? ` · PIC: ${s.picName}` : ""} · ${s.status} · oleh ${s.createdByName} · ${formatDate(s.createdAt, true)}`,
+      blocks: [{ label: "Deskripsi", text: s.description }],
+    })));
+  }
+
   return (
     <div>
       <PageHeader
@@ -151,7 +266,10 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
       {selected && (
         <ImportResult
           detail={selected}
-          onDelete={canUpload ? () => removeImport(selected.id) : undefined}
+          onDelete={canUpload && selected.isOwner ? () => removeImport(selected.id) : undefined}
+          onToggleVisibility={() => toggleImportVisibility(selected)}
+          onExportExcel={() => exportImportDetail(selected, "excel")}
+          onExportPdf={() => exportImportDetail(selected, "pdf")}
         />
       )}
 
@@ -177,8 +295,11 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
       {activeTab === "keuangan" && (
         <>
           <Card className="!p-0 overflow-hidden">
-            <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">Riwayat Impor</h3>
+              {history.length > 0 && (
+                <ExportButtons onExcel={() => exportImportHistory("excel")} onPdf={() => exportImportHistory("pdf")} />
+              )}
             </div>
             {loadingHistory ? (
               <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -191,6 +312,7 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
                     <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       <th className="px-5 py-3 font-medium">File</th>
                       <th className="px-5 py-3 font-medium">Status</th>
+                      <th className="px-5 py-3 font-medium">Visibilitas</th>
                       <th className="px-5 py-3 font-medium">Transaksi</th>
                       <th className="px-5 py-3 font-medium">Pemasukan</th>
                       <th className="px-5 py-3 font-medium">Pengeluaran</th>
@@ -206,12 +328,13 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
                           <p className="text-xs text-slate-400">oleh {h.uploadedByName}</p>
                         </td>
                         <td className="px-5 py-3"><ImportStatusBadge status={h.status} /></td>
+                        <td className="px-5 py-3"><VisibilityBadge visibility={h.visibility} isOwner={h.isOwner} onToggle={() => toggleImportVisibility(h)} /></td>
                         <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{h.transactionCount}</td>
                         <td className="px-5 py-3 text-emerald-600 dark:text-emerald-400">{formatCurrency(h.totalIncome)}</td>
                         <td className="px-5 py-3 text-red-600 dark:text-red-400">{formatCurrency(h.totalExpense)}</td>
                         <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{formatDate(h.createdAt, true)}</td>
                         <td className="px-5 py-3 text-right">
-                          {canUpload && (
+                          {canUpload && h.isOwner && (
                             <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600" onClick={(e) => { e.stopPropagation(); removeImport(h.id); }}>
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -226,8 +349,11 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
           </Card>
 
           <Card className="!p-0 overflow-hidden mt-6">
-            <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">Riwayat Komparasi Keuangan</h3>
+              {comparisons.length > 0 && (
+                <ExportButtons onExcel={() => exportComparisons("excel")} onPdf={() => exportComparisons("pdf")} />
+              )}
             </div>
             {loadingComparisons ? (
               <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -242,10 +368,13 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
                     <div key={c.id} className="p-5">
                       <div className="mb-3 flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-slate-800 dark:text-slate-100">{c.title}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-slate-800 dark:text-slate-100">{c.title}</p>
+                            <VisibilityBadge visibility={c.visibility} isOwner={c.isOwner} onToggle={() => toggleComparisonVisibility(c)} />
+                          </div>
                           <p className="text-xs text-slate-400">oleh {c.createdByName} · {formatDate(c.createdAt, true)}</p>
                         </div>
-                        {canUpload && (
+                        {canUpload && c.isOwner && (
                           <button className="rounded-lg p-2 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600" onClick={() => removeComparison(c.id)}>
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -278,8 +407,9 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
       {/* ── Tab: CPAS Plans ── */}
       {activeTab === "cpas" && (
         <Card className="!p-0 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
             <h3 className="font-semibold text-slate-800 dark:text-slate-100">CPAS Plans Afiliasi</h3>
+            {cpasList.length > 0 && <ExportButtons onPdf={exportCpasPdf} />}
           </div>
           {loadingCpas ? (
             <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -323,8 +453,9 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
       {/* ── Tab: SOP Plans ── */}
       {activeTab === "sop" && (
         <Card className="!p-0 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
             <h3 className="font-semibold text-slate-800 dark:text-slate-100">SOP Plans Afiliasi</h3>
+            {sopList.length > 0 && <ExportButtons onPdf={exportSopPdf} />}
           </div>
           {loadingSop ? (
             <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -373,6 +504,49 @@ function ImportStatusBadge({ status }: { status: ImportSummary["status"] }) {
   return <span className={cn("badge", map[status])}>{label[status]}</span>;
 }
 
+// Badge visibilitas — klik untuk toggle bila pengguna adalah pemiliknya.
+function VisibilityBadge({ visibility, isOwner, onToggle }: { visibility: Visibility; isOwner: boolean; onToggle?: () => void }) {
+  const isPrivate = visibility === "PRIVATE";
+  const badge = (
+    <span
+      className={cn(
+        "badge inline-flex items-center gap-1",
+        isPrivate ? "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400" : "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300"
+      )}
+    >
+      {isPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+      {isPrivate ? "Privat" : "Semua orang"}
+    </span>
+  );
+  if (!isOwner || !onToggle) return badge;
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      title={isPrivate ? "Klik untuk buat terlihat semua orang" : "Klik untuk buat privat (hanya Anda)"}
+      className="transition-opacity hover:opacity-70"
+    >
+      {badge}
+    </button>
+  );
+}
+
+// Tombol ekspor Excel/PDF — dipakai di header tiap section riwayat.
+function ExportButtons({ onExcel, onPdf }: { onExcel?: () => void; onPdf: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      {onExcel && (
+        <button onClick={onExcel} className="btn-ghost !py-1.5 !px-3 text-xs">
+          <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+        </button>
+      )}
+      <button onClick={onPdf} className="btn-ghost !py-1.5 !px-3 text-xs">
+        <FileDown className="h-3.5 w-3.5" /> PDF
+      </button>
+    </div>
+  );
+}
+
 function SopStatusBadge({ status }: { status: SopPlan["status"] }) {
   const map: Record<SopPlan["status"], string> = {
     DRAFT: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
@@ -383,20 +557,31 @@ function SopStatusBadge({ status }: { status: SopPlan["status"] }) {
   return <span className={cn("badge", map[status])}>{label[status]}</span>;
 }
 
-function ImportResult({ detail, onDelete }: { detail: ImportDetail; onDelete?: () => void }) {
+function ImportResult({
+  detail, onDelete, onToggleVisibility, onExportExcel, onExportPdf,
+}: {
+  detail: ImportDetail; onDelete?: () => void; onToggleVisibility: () => void;
+  onExportExcel: () => void; onExportPdf: () => void;
+}) {
   const net = detail.totalIncome - detail.totalExpense;
   return (
     <div className="mb-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Hasil Ekstraksi — {detail.fileName}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">Hasil Ekstraksi — {detail.fileName}</h3>
+            <VisibilityBadge visibility={detail.visibility} isOwner={detail.isOwner} onToggle={onToggleVisibility} />
+          </div>
           <p className="text-xs text-slate-400">Diunggah oleh {detail.uploadedBy.fullName} · {formatDate(detail.createdAt, true)}</p>
         </div>
-        {onDelete && (
-          <button className="btn-ghost !py-1.5 !px-3 text-xs text-red-600" onClick={onDelete}>
-            <Trash2 className="h-3.5 w-3.5" /> Hapus Riwayat Ini
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButtons onExcel={onExportExcel} onPdf={onExportPdf} />
+          {onDelete && (
+            <button className="btn-ghost !py-1.5 !px-3 text-xs text-red-600" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5" /> Hapus Riwayat Ini
+            </button>
+          )}
+        </div>
       </div>
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total Pemasukan" value={formatCurrency(detail.totalIncome)} tone="green" icon={<TrendingUp className="h-5 w-5" />} />

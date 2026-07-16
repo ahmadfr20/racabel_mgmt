@@ -13,6 +13,8 @@ export interface CurrentUser {
   role: { id: number; name: string; color: string };
   department: { id: number; name: string } | null;
   permissions: string[];
+  employmentStatus: "MAGANG" | "KONTRAK" | "PEGAWAI_TETAP";
+  contractEndDate: Date | null;
 }
 
 // Cached per request agar tidak query berkali-kali dalam satu render.
@@ -40,6 +42,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     role: { id: user.role.id, name: user.role.name, color: user.role.color },
     department: user.department ? { id: user.department.id, name: user.department.name } : null,
     permissions: user.role.permissions.map((rp) => rp.permission.key),
+    employmentStatus: user.employmentStatus,
+    contractEndDate: user.contractEndDate,
   };
 });
 

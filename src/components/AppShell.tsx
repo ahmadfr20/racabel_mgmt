@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  Bot, CalendarClock, CalendarDays, ChevronDown, ClipboardList, LayoutDashboard,
+  Bot, CalendarClock, CalendarDays, ChevronDown, ClipboardList, FileClock, FileSignature, LayoutDashboard,
   LogOut, Menu, Moon, RefreshCcw, Settings, ShieldCheck, ShoppingBag, ShoppingCart,
-  Store, Sun, Ticket, Users, Wallet, X,
+  Store, Sun, Ticket, UserCog, Users, Wallet, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
 import { AssistantBubble } from "@/components/assistant/AssistantBubble";
+import { ProfileModal } from "@/components/profile/ProfileModal";
 
 export interface ShellUser {
   fullName: string;
@@ -33,14 +34,16 @@ const NAV: NavItem[] = [
   { href: "/attendance", label: "Absensi",       icon: CalendarClock,   anyOf: ["attendance.checkin", "attendance.view_all"] },
   { href: "/leave",      label: "Cuti",          icon: CalendarDays,    anyOf: ["leave.request", "leave.view_all", "leave.approve"] },
   { href: "/employees",  label: "Karyawan",      icon: Users,           anyOf: ["employees.view"] },
+  { href: "/contracts",  label: "Kontrak & LoA", icon: FileSignature,   anyOf: ["contract.manage"] },
+  { href: "/contract-extensions", label: "Perpanjangan Kontrak", icon: FileClock, anyOf: [] }, // [] = tampil untuk role apapun
   { href: "/tasklog",    label: "Task Log",      icon: ClipboardList,   anyOf: ["tasklog.write", "tasklog.view_all"] },
   { href: "/pdca",       label: "PDCA",          icon: RefreshCcw,      anyOf: ["pdca.view", "pdca.manage"] },
   { href: "/tickets",    label: "Ticketing",     icon: Ticket,          anyOf: ["tickets.create", "tickets.view_all", "tickets.manage"] },
   { href: "/payroll",    label: "Kinerja & Gaji",icon: Wallet,          anyOf: ["payroll.view", "payroll.manage"] },
-  { href: "/financial",  label: "AI Assistant",  icon: Bot,             anyOf: ["financial.view", "financial.upload"] },
-  { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["dashboard.view"] },
-  { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["dashboard.view"] },
-  { href: "/shopee",     label: "Shopee",        icon: ShoppingCart,    anyOf: ["dashboard.view"] },
+  { href: "/financial",  label: "AI Assistant",  icon: Bot,             anyOf: [] }, // [] = tampil untuk role apapun
+  { href: "/tiktok",     label: "TikTok Shop",   icon: ShoppingBag,     anyOf: ["marketplace.view"] },
+  { href: "/tokopedia",  label: "Tokopedia",     icon: Store,           anyOf: ["marketplace.view"] },
+  { href: "/shopee",     label: "Shopee",        icon: ShoppingCart,    anyOf: ["marketplace.view"] },
   { href: "/settings",   label: "Pengaturan",    icon: Settings,        anyOf: ["roles.manage", "departments.manage", "settings.manage"] },
 ];
 
@@ -49,9 +52,10 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { theme, toggle } = useTheme();
 
-  const items = NAV.filter((n) => n.anyOf.some((p) => user.permissions.includes(p)));
+  const items = NAV.filter((n) => n.anyOf.length === 0 || n.anyOf.some((p) => user.permissions.includes(p)));
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -124,8 +128,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                       </p>
                     </div>
                     <button
+                      onClick={() => { setMenuOpen(false); setProfileOpen(true); }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                    >
+                      <UserCog className="h-4 w-4" /> Edit Profil
+                    </button>
+                    <button
                       onClick={logout}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      className="flex w-full items-center gap-2 border-t border-slate-100 dark:border-slate-700 px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
                       <LogOut className="h-4 w-4" /> Keluar
                     </button>
@@ -139,7 +149,11 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         <main className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
 
-      {user.permissions.includes("assistant.use") && <AssistantBubble />}
+      {user.permissions.includes("assistant.use") && (
+        <AssistantBubble canUpload={user.permissions.includes("financial.upload")} />
+      )}
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} onSaved={() => router.refresh()} />
     </div>
   );
 }

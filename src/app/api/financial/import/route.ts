@@ -9,9 +9,11 @@ const ALLOWED_EXT = /\.(csv|xlsx|xls)$/i;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Riwayat impor keuangan (ringkas, tanpa detail transaksi per baris).
+// Hanya menampilkan data milik sendiri, atau yang visibility-nya EVERYONE.
 export const GET = handle(async () => {
-  await requirePermission("financial.view");
+  const user = await requirePermission("financial.view");
   const imports = await prisma.financialImport.findMany({
+    where: { OR: [{ uploadedById: user.id }, { visibility: "EVERYONE" }] },
     orderBy: { createdAt: "desc" },
     include: {
       uploadedBy: { select: { fullName: true } },
@@ -23,6 +25,8 @@ export const GET = handle(async () => {
       id: i.id,
       fileName: i.fileName,
       status: i.status,
+      visibility: i.visibility,
+      isOwner: i.uploadedById === user.id,
       currency: i.currency,
       totalIncome: i.totalIncome,
       totalExpense: i.totalExpense,

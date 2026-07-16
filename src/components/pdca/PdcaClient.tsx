@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CalendarRange, Check, Circle, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatDate, cn } from "@/lib/utils";
@@ -19,17 +19,22 @@ interface PdcaWeekItem {
   title: string;
   startDate: string | null;
   endDate: string | null;
+  departmentId: number;
+  departmentName: string;
   tasks: PdcaTaskItem[];
 }
-interface Person { id: number; fullName: string }
+interface Person { id: number; fullName: string; department: { id: number; name: string } | null }
+interface DeptOption { id: number; name: string }
 
-const WEEK_EMPTY = { title: "", startDate: "", endDate: "" };
+const WEEK_EMPTY = { title: "", departmentId: "", startDate: "", endDate: "" };
 const TASK_EMPTY = { title: "", userId: "", status: "BELUM_SELESAI" as "BELUM_SELESAI" | "SELESAI" };
 
 export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; currentUserId: number }) {
   const [weeks, setWeeks] = useState<PdcaWeekItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<Person[]>([]);
+  const [departments, setDepartments] = useState<DeptOption[]>([]);
+  const [filterDepartment, setFilterDepartment] = useState("");
 
   const [weekModalOpen, setWeekModalOpen] = useState(false);
   const [editingWeek, setEditingWeek] = useState<PdcaWeekItem | null>(null);
@@ -43,17 +48,20 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      setWeeks(await apiFetch<PdcaWeekItem[]>("/api/pdca/weeks"));
+      const qs = filterDepartment ? `?department=${filterDepartment}` : "";
+      setWeeks(await apiFetch<PdcaWeekItem[]>(`/api/pdca/weeks${qs}`));
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterDepartment]);
+
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    load();
+    apiFetch<{ departments: DeptOption[] }>("/api/options").then((o) => setDepartments(o.departments)).catch(() => setDepartments([]));
     if (canManage) apiFetch<Person[]>("/api/employees").then(setPeople).catch(() => setPeople([]));
   }, [canManage]);
 
@@ -66,7 +74,10 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
   }
   function openEditWeek(w: PdcaWeekItem) {
     setEditingWeek(w);
-    setWeekForm({ title: w.title, startDate: w.startDate?.slice(0, 10) ?? "", endDate: w.endDate?.slice(0, 10) ?? "" });
+    setWeekForm({
+      title: w.title, departmentId: String(w.departmentId),
+      startDate: w.startDate?.slice(0, 10) ?? "", endDate: w.endDate?.slice(0, 10) ?? "",
+    });
     setError("");
     setWeekModalOpen(true);
   }
@@ -74,7 +85,12 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
     e.preventDefault();
     setError(""); setSaving(true);
     try {
-      const payload = { title: weekForm.title, startDate: weekForm.startDate || null, endDate: weekForm.endDate || null };
+      const payload = {
+        title: weekForm.title,
+        departmentId: Number(weekForm.departmentId),
+        startDate: weekForm.startDate || null,
+        endDate: weekForm.endDate || null,
+      };
       if (editingWeek) await apiFetch(`/api/pdca/weeks/${editingWeek.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       else await apiFetch("/api/pdca/weeks", { method: "POST", body: JSON.stringify(payload) });
       setWeekModalOpen(false);
@@ -151,17 +167,30 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
     return "Periode belum diatur";
   }
 
+  const activeWeek = weeks.find((w) => w.id === activeWeekId);
+  const picOptions = activeWeek ? people.filter((p) => p.department?.id === activeWeek.departmentId) : people;
+
   return (
     <div>
       <PageHeader
         title="Manajemen PDCA"
-        subtitle="Checklist mingguan: daftar task, PIC, dan status penyelesaian."
+        subtitle="Checklist mingguan per department: daftar task, PIC, dan status penyelesaian."
         action={canManage && (
           <button className="btn-primary" onClick={openCreateWeek}>
             <Plus className="h-4 w-4" /> Tambah Minggu
           </button>
         )}
       />
+
+      <Card className="mb-4 !p-3">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Filter Department</label>
+          <select className="input !w-auto" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
+            <option value="">Semua Department</option>
+            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+      </Card>
 
       {loading ? (
         <div className="py-16 text-center text-sm text-slate-400">Memuat data...</div>
@@ -176,8 +205,9 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
               <Card key={w.id} className="!p-0 overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700 px-5 py-4">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-slate-800 dark:text-slate-100">{w.title}</h3>
+                      <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300">{w.departmentName}</span>
                       {total > 0 && (
                         <span className={cn(
                           "badge",
@@ -262,6 +292,22 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
             <label className="label">Judul Minggu *</label>
             <input className="input" value={weekForm.title} onChange={(e) => setWeekForm((f) => ({ ...f, title: e.target.value }))} required placeholder="mis. Week 1" />
           </div>
+          <div>
+            <label className="label">Department *</label>
+            <select
+              className="input"
+              value={weekForm.departmentId}
+              onChange={(e) => setWeekForm((f) => ({ ...f, departmentId: e.target.value }))}
+              disabled={!!editingWeek && editingWeek.tasks.length > 0}
+              required
+            >
+              <option value="">Pilih department...</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            {editingWeek && editingWeek.tasks.length > 0 && (
+              <p className="mt-1 text-xs text-slate-400">Department tidak dapat diubah karena minggu ini sudah punya task.</p>
+            )}
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Tanggal Mulai</label>
@@ -290,9 +336,12 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
           <div>
             <label className="label">PIC (Penanggung Jawab) *</label>
             <select className="input" value={taskForm.userId} onChange={(e) => setTaskForm((f) => ({ ...f, userId: e.target.value }))} required>
-              {people.length === 0 && <option value={currentUserId}>Saya sendiri</option>}
-              {people.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
+              {picOptions.length === 0 && <option value="">Belum ada karyawan di department ini</option>}
+              {picOptions.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
             </select>
+            {activeWeek && (
+              <p className="mt-1 text-xs text-slate-400">Hanya menampilkan karyawan department {activeWeek.departmentName}.</p>
+            )}
           </div>
           <div>
             <label className="label">Status</label>

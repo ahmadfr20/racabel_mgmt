@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionCookieName, verifySession } from "./lib/session";
 
-// Rute yang boleh diakses tanpa login
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// Rute yang boleh diakses tanpa login (login page + endpoint machine-to-machine
+// yang punya otorisasi sendiri lewat header, bukan session cookie — mis. cron).
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/cron"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

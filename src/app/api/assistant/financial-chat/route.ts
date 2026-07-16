@@ -29,9 +29,6 @@ const messagesSchema = z
 // hasil komparasi keuangan ke database, dan menerima lampiran Excel/CSV/PDF.
 export const POST = handle(async (req: NextRequest) => {
   const user = await requireUser();
-  if (!user.permissions.includes("financial.view") && !user.permissions.includes("financial.upload")) {
-    throw new AuthError("Anda tidak memiliki akses ke Asisten Keuangan", 403);
-  }
 
   const formData = await req.formData();
   const messagesRaw = formData.get("messages");
