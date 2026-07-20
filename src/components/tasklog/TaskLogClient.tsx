@@ -31,6 +31,9 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
   const [list, setList] = useState<TaskLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TaskLog | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
@@ -52,8 +55,16 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
   }, [list]);
 
   const filtered = useMemo(
-    () => (userFilter ? list.filter((l) => String(l.userId) === userFilter) : list),
-    [list, userFilter]
+    () =>
+      list.filter((l) => {
+        if (userFilter && String(l.userId) !== userFilter) return false;
+        if (statusFilter && l.status !== statusFilter) return false;
+        const d = l.date.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      }),
+    [list, userFilter, statusFilter, dateFrom, dateTo]
   );
 
   function openCreate() { setEditing(null); setForm({ ...EMPTY, date: todayISO() }); setError(""); setOpen(true); }
@@ -100,19 +111,54 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
         )}
       />
 
-      {canViewAll && people.length > 0 && (
-        <Card className="mb-4 !p-3">
-          <select className="input !w-auto" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
-            <option value="">Semua karyawan</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </Card>
-      )}
+      <Card className="mb-4 !p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          {canViewAll && people.length > 0 && (
+            <div>
+              <label className="label">Karyawan</label>
+              <select className="input !w-auto" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
+                <option value="">Semua karyawan</option>
+                {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="label">Status</label>
+            <select className="input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">Semua status</option>
+              <option value="PLANNED">Direncanakan</option>
+              <option value="IN_PROGRESS">Dikerjakan</option>
+              <option value="DONE">Selesai</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Dari tanggal</label>
+            <input className="input !w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Sampai tanggal</label>
+            <input className="input !w-auto" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          {(userFilter || statusFilter || dateFrom || dateTo) && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => { setUserFilter(""); setStatusFilter(""); setDateFrom(""); setDateTo(""); }}
+            >
+              Reset Filter
+            </button>
+          )}
+        </div>
+      </Card>
 
       {loading ? (
         <div className="py-16 text-center text-sm text-slate-400">Memuat data...</div>
       ) : filtered.length === 0 ? (
-        <EmptyState title="Belum ada task log" subtitle="Tambahkan catatan pekerjaan harian Anda." icon={<ClipboardList className="h-10 w-10" />} />
+        list.length > 0 ? (
+          <EmptyState title="Tidak ada task log yang cocok" subtitle="Coba ubah atau reset filter." icon={<ClipboardList className="h-10 w-10" />} />
+        ) : (
+          <EmptyState title="Belum ada task log" subtitle="Tambahkan catatan pekerjaan harian Anda." icon={<ClipboardList className="h-10 w-10" />} />
+        )
       ) : (
         <Card className="!p-0 overflow-hidden">
           <div className="overflow-x-auto">

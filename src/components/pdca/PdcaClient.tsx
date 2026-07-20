@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarRange, Check, Circle, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatDate, cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ interface PdcaTaskItem {
   status: "BELUM_SELESAI" | "SEDANG_BERJALAN" | "SELESAI";
   userId: number;
   userName: string;
+  deadline: string | null;
 }
 interface PdcaWeekItem {
   id: number;
@@ -35,6 +36,9 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
   const [people, setPeople] = useState<Person[]>([]);
   const [departments, setDepartments] = useState<DeptOption[]>([]);
   const [filterDepartment, setFilterDepartment] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [weekModalOpen, setWeekModalOpen] = useState(false);
   const [editingWeek, setEditingWeek] = useState<PdcaWeekItem | null>(null);
@@ -170,6 +174,27 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
   const activeWeek = weeks.find((w) => w.id === activeWeekId);
   const picOptions = activeWeek ? people.filter((p) => p.department?.id === activeWeek.departmentId) : people;
 
+  // Filter Status & Deadline diterapkan ke task per minggu (mirip filter di Task Log Harian).
+  // Minggu yang jadi kosong akibat filter disembunyikan; minggu yang memang belum punya task tetap tampil bila tak ada filter aktif.
+  const hasTaskFilter = !!(statusFilter || dateFrom || dateTo);
+  const displayWeeks = useMemo(
+    () =>
+      weeks
+        .map((w) => ({
+          week: w,
+          tasks: w.tasks.filter((t) => {
+            if (statusFilter && t.status !== statusFilter) return false;
+            if ((dateFrom || dateTo) && !t.deadline) return false;
+            const d = t.deadline?.slice(0, 10);
+            if (dateFrom && d && d < dateFrom) return false;
+            if (dateTo && d && d > dateTo) return false;
+            return true;
+          }),
+        }))
+        .filter((x) => !hasTaskFilter || x.tasks.length > 0),
+    [weeks, statusFilter, dateFrom, dateTo, hasTaskFilter]
+  );
+
   return (
     <div>
       <PageHeader
@@ -183,22 +208,59 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
       />
 
       <Card className="mb-4 !p-3">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Filter Department</label>
-          <select className="input !w-auto" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
-            <option value="">Semua Department</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="label">Department</label>
+            <select className="input !w-auto" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
+              <option value="">Semua Department</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select className="input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">Semua status</option>
+              <option value="BELUM_SELESAI">Belum Selesai</option>
+              <option value="SEDANG_BERJALAN">Sedang Berjalan</option>
+              <option value="SELESAI">Selesai</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Dari tanggal (deadline)</label>
+            <input className="input !w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Sampai tanggal (deadline)</label>
+            <input className="input !w-auto" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          {(filterDepartment || statusFilter || dateFrom || dateTo) && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => { setFilterDepartment(""); setStatusFilter(""); setDateFrom(""); setDateTo(""); }}
+            >
+              Reset Filter
+            </button>
+          )}
         </div>
+        {(dateFrom || dateTo) && (
+          <p className="mt-2 text-xs text-slate-400">
+            Filter tanggal memakai deadline task. Task tanpa deadline (dibuat manual, bukan dari sinkron Notion) tidak akan tampil saat filter ini aktif.
+          </p>
+        )}
       </Card>
 
       {loading ? (
         <div className="py-16 text-center text-sm text-slate-400">Memuat data...</div>
-      ) : weeks.length === 0 ? (
-        <EmptyState title="Belum ada minggu PDCA" subtitle="Buat minggu pertama untuk mulai mencatat task." icon={<CalendarRange className="h-10 w-10" />} />
+      ) : displayWeeks.length === 0 ? (
+        weeks.length > 0 ? (
+          <EmptyState title="Tidak ada minggu yang cocok" subtitle="Coba ubah atau reset filter." icon={<CalendarRange className="h-10 w-10" />} />
+        ) : (
+          <EmptyState title="Belum ada minggu PDCA" subtitle="Buat minggu pertama untuk mulai mencatat task." icon={<CalendarRange className="h-10 w-10" />} />
+        )
       ) : (
         <div className="grid gap-4">
-          {weeks.map((w) => {
+          {displayWeeks.map(({ week: w, tasks: visibleTasks }) => {
             const done = w.tasks.filter((t) => t.status === "SELESAI").length;
             const total = w.tasks.length;
             return (
@@ -232,11 +294,13 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
                   )}
                 </div>
 
-                {w.tasks.length === 0 ? (
-                  <p className="px-5 py-6 text-center text-sm text-slate-400">Belum ada task di minggu ini.</p>
+                {visibleTasks.length === 0 ? (
+                  <p className="px-5 py-6 text-center text-sm text-slate-400">
+                    {w.tasks.length === 0 ? "Belum ada task di minggu ini." : "Tidak ada task yang cocok dengan filter."}
+                  </p>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                    {w.tasks.map((t) => {
+                    {visibleTasks.map((t) => {
                       const canToggle = canManage || t.userId === currentUserId;
                       const isDone = t.status === "SELESAI";
                       return (

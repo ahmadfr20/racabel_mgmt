@@ -37,6 +37,7 @@ export const GET = handle(async (req: NextRequest) => {
         status: t.status,
         userId: t.userId,
         userName: t.user.fullName,
+        deadline: t.deadline,
       })),
     }))
   );
