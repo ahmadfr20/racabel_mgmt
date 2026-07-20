@@ -7,7 +7,7 @@ import { requireUser, AuthError } from "@/lib/auth";
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   userId: z.coerce.number().int().positive().optional(),
-  status: z.enum(["BELUM_SELESAI", "SELESAI"]).optional(),
+  status: z.enum(["BELUM_SELESAI", "SEDANG_BERJALAN", "SELESAI"]).optional(),
   order: z.coerce.number().int().min(0).optional(),
 });
 

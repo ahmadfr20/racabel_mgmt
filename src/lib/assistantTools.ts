@@ -208,7 +208,7 @@ const addPdcaTask: AssistantTool = {
       weekId: { type: "number", description: "Id minggu PDCA tujuan" },
       title: { type: "string", description: "Judul task" },
       userId: { type: "number", description: "Id PIC (penanggung jawab); default diri sendiri bila tidak diisi. Harus berasal dari department minggu ini." },
-      status: { type: "string", enum: ["BELUM_SELESAI", "SELESAI"], description: "Default BELUM_SELESAI" },
+      status: { type: "string", enum: ["BELUM_SELESAI", "SEDANG_BERJALAN", "SELESAI"], description: "Default BELUM_SELESAI" },
     },
     required: ["weekId", "title"],
   },
@@ -219,7 +219,7 @@ const addPdcaTask: AssistantTool = {
         weekId: z.number().int().positive(),
         title: z.string().min(1),
         userId: z.number().int().positive().optional(),
-        status: z.enum(["BELUM_SELESAI", "SELESAI"]).default("BELUM_SELESAI"),
+        status: z.enum(["BELUM_SELESAI", "SEDANG_BERJALAN", "SELESAI"]).default("BELUM_SELESAI"),
       })
       .parse(input);
     const week = await prisma.pdcaWeek.findUnique({ where: { id: d.weekId } });
@@ -253,7 +253,7 @@ const updatePdcaTaskStatus: AssistantTool = {
   },
   available: (u) => u.permissions.includes("pdca.view") || u.permissions.includes("pdca.manage"),
   run: async (input, user) => {
-    const d = z.object({ taskId: z.number().int().positive(), status: z.enum(["BELUM_SELESAI", "SELESAI"]) }).parse(input);
+    const d = z.object({ taskId: z.number().int().positive(), status: z.enum(["BELUM_SELESAI", "SEDANG_BERJALAN", "SELESAI"]) }).parse(input);
     const task = await prisma.pdcaTask.findUnique({ where: { id: d.taskId } });
     if (!task) return err(`Task id ${d.taskId} tidak ditemukan`);
     const canManage = user.permissions.includes("pdca.manage");

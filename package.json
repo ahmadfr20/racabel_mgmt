@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
+    "@notionhq/client": "^5.23.2",
     "@prisma/client": "^6.1.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",

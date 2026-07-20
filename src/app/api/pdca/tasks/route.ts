@@ -8,7 +8,7 @@ const createSchema = z.object({
   weekId: z.coerce.number().int().positive(),
   title: z.string().min(1, "Judul task wajib diisi"),
   userId: z.coerce.number().int().positive(),
-  status: z.enum(["BELUM_SELESAI", "SELESAI"]).default("BELUM_SELESAI"),
+  status: z.enum(["BELUM_SELESAI", "SEDANG_BERJALAN", "SELESAI"]).default("BELUM_SELESAI"),
 });
 
 // POST: tambah task ke sebuah minggu PDCA. Butuh pdca.manage.

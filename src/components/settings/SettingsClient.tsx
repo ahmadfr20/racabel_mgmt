@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Building, Clock, ShieldCheck } from "lucide-react";
+import { Building, Clock, Plug, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { RolesPanel } from "./RolesPanel";
 import { DepartmentsPanel } from "./DepartmentsPanel";
 import { SchedulePanel } from "./SchedulePanel";
+import { NotionSyncPanel } from "./NotionSyncPanel";
 
-type TabKey = "roles" | "departments" | "schedule";
+type TabKey = "roles" | "departments" | "schedule" | "notion";
 
 export function SettingsClient({ tabs }: { tabs: Record<TabKey, boolean> }) {
   const all: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: "roles", label: "Role & Authority", icon: ShieldCheck },
     { key: "departments", label: "Department", icon: Building },
     { key: "schedule", label: "Jam Kerja & Toleransi", icon: Clock },
+    { key: "notion", label: "Integrasi Notion", icon: Plug },
   ];
   const available = all.filter((t) => tabs[t.key]);
 
@@ -45,6 +47,7 @@ export function SettingsClient({ tabs }: { tabs: Record<TabKey, boolean> }) {
       {active === "roles" && <RolesPanel />}
       {active === "departments" && <DepartmentsPanel />}
       {active === "schedule" && <SchedulePanel />}
+      {active === "notion" && <NotionSyncPanel />}
     </div>
   );
 }

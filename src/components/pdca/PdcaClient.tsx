@@ -10,7 +10,7 @@ import { Modal } from "@/components/Modal";
 interface PdcaTaskItem {
   id: number;
   title: string;
-  status: "BELUM_SELESAI" | "SELESAI";
+  status: "BELUM_SELESAI" | "SEDANG_BERJALAN" | "SELESAI";
   userId: number;
   userName: string;
 }
@@ -27,7 +27,7 @@ interface Person { id: number; fullName: string; department: { id: number; name:
 interface DeptOption { id: number; name: string }
 
 const WEEK_EMPTY = { title: "", departmentId: "", startDate: "", endDate: "" };
-const TASK_EMPTY = { title: "", userId: "", status: "BELUM_SELESAI" as "BELUM_SELESAI" | "SELESAI" };
+const TASK_EMPTY = { title: "", userId: "", status: "BELUM_SELESAI" as "BELUM_SELESAI" | "SEDANG_BERJALAN" | "SELESAI" };
 
 export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; currentUserId: number }) {
   const [weeks, setWeeks] = useState<PdcaWeekItem[]>([]);
@@ -345,8 +345,9 @@ export function PdcaClient({ canManage, currentUserId }: { canManage: boolean; c
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="input" value={taskForm.status} onChange={(e) => setTaskForm((f) => ({ ...f, status: e.target.value as "BELUM_SELESAI" | "SELESAI" }))}>
+            <select className="input" value={taskForm.status} onChange={(e) => setTaskForm((f) => ({ ...f, status: e.target.value as "BELUM_SELESAI" | "SEDANG_BERJALAN" | "SELESAI" }))}>
               <option value="BELUM_SELESAI">Belum Selesai</option>
+              <option value="SEDANG_BERJALAN">Sedang Berjalan</option>
               <option value="SELESAI">Selesai</option>
             </select>
           </div>

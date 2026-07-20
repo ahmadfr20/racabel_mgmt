@@ -93,7 +93,8 @@ model User {
   payrolls             Payroll[]
   assignedKpis         KpiMetric[]           @relation("UserKpis")
   taskLogs             TaskLog[]
-  pdcaTasks            PdcaTask[]
+  pdcaTasks            PdcaTask[]             @relation("PdcaTaskDo")
+  pdcaChecks           PdcaTask[]             @relation("PdcaTaskCheck")
   financialImports     FinancialImport[]
   financialComparisons FinancialComparison[]
   ticketsRequested     Ticket[]              @relation("TicketRequester")
@@ -276,16 +277,17 @@ enum TaskStatus {
 }
 
 model TaskLog {
-  id          Int        @id @default(autoincrement())
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      Int
-  date        DateTime   @db.Date // tanggal pekerjaan
-  title       String
-  description String?    @db.Text
-  status      TaskStatus @default(DONE)
-  hours       Float? // durasi jam (opsional)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            Int        @id @default(autoincrement())
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  date          DateTime   @db.Date // tanggal pekerjaan
+  title         String
+  description   String?    @db.Text
+  status        TaskStatus @default(DONE)
+  hours         Float? // durasi jam (opsional)
+  notionPageId  String?    @unique // id halaman Notion asal, utk sync idempotent (null = input manual)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([userId, date])
   @@index([date])
@@ -295,6 +297,7 @@ model TaskLog {
 
 enum PdcaTaskStatus {
   BELUM_SELESAI
+  SEDANG_BERJALAN
   SELESAI
 }
 
@@ -314,19 +317,25 @@ model PdcaWeek {
 }
 
 model PdcaTask {
-  id        Int            @id @default(autoincrement())
-  week      PdcaWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
-  weekId    Int
-  title     String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade) // PIC
-  userId    Int
-  status    PdcaTaskStatus @default(BELUM_SELESAI)
-  order     Int            @default(0)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id           Int            @id @default(autoincrement())
+  week         PdcaWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  weekId       Int
+  title        String // Plan
+  user         User           @relation("PdcaTaskDo", fields: [userId], references: [id], onDelete: Cascade) // PIC (Do)
+  userId       Int
+  checkUser    User?          @relation("PdcaTaskCheck", fields: [checkUserId], references: [id], onDelete: SetNull) // PIC Check
+  checkUserId  Int?
+  act          String?        @db.Text // catatan evaluasi (Act)
+  deadline     DateTime?      @db.Date
+  status       PdcaTaskStatus @default(BELUM_SELESAI)
+  order        Int            @default(0)
+  notionPageId String?        @unique // id halaman Notion asal, utk sync idempotent (null = input manual)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([weekId])
   @@index([userId])
+  @@index([checkUserId])
 }
 
 // ============ Impor Data Keuangan (ekstraksi otomatis via AI dari file Excel/CSV) ============

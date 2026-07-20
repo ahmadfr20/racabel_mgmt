@@ -8,7 +8,8 @@ export default async function SettingsPage() {
     roles: can(user, "roles.manage"),
     departments: can(user, "departments.manage"),
     schedule: can(user, "settings.manage"),
+    notion: can(user, "settings.manage"),
   };
-  if (!tabs.roles && !tabs.departments && !tabs.schedule) redirect("/dashboard");
+  if (!tabs.roles && !tabs.departments && !tabs.schedule && !tabs.notion) redirect("/dashboard");
   return <SettingsClient tabs={tabs} />;
 }
