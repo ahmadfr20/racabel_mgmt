@@ -136,7 +136,7 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center gap-2">
             <CalendarClock className="h-4 w-4 text-brand-600" />
-            <h3 className="font-semibold text-slate-800">Tren Kehadiran (7 hari)</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">Tren Kehadiran (7 hari)</h3>
           </div>
           <AttendanceTrendChart data={trend} />
         </Card>
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
         <Card>
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-brand-600" />
-            <h3 className="font-semibold text-slate-800">{isManager ? "Kinerja per Department" : "Capaian KPI Anda"}</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">{isManager ? "Kinerja per Department" : "Capaian KPI Anda"}</h3>
           </div>
           {isManager ? (
             deptPerformance.length ? <PerformanceByDeptChart data={deptPerformance} /> : <NoData />
@@ -179,7 +179,7 @@ export default async function DashboardPage() {
                       {canSeeLeaves ? l.user.fullName : LEAVE_TYPE_LABEL[l.type]}
                       {canSeeLeaves && <span className="ml-2 text-xs text-slate-400">{l.user.department?.name}</span>}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       {LEAVE_TYPE_LABEL[l.type]} · {formatDate(l.startDate)} – {formatDate(l.endDate)}
                     </p>
                   </div>
@@ -215,7 +215,7 @@ export default async function DashboardPage() {
                           <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{t.title}</p>
                           {overdue && <span className="badge shrink-0 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"><AlertTriangle className="mr-1 h-3 w-3" /> Overdue</span>}
                         </div>
-                        <p className="truncate text-xs text-slate-500">
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                           {canSeeAllTickets ? `${t.requester.fullName} · ` : ""}
                           PIC: {t.assignee?.fullName ?? "belum ditugaskan"}
                           {t.dueDate ? ` · Due ${formatDate(t.dueDate)}` : ""}

@@ -100,14 +100,14 @@ export function RolesPanel() {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">{r.name}</p>
-                  <p className="text-xs text-slate-400">{r.userCount} karyawan</p>
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">{r.name}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{r.userCount} karyawan</p>
                 </div>
               </div>
-              {r.isSystem && <span className="badge bg-slate-100 text-slate-500">Bawaan</span>}
+              {r.isSystem && <span className="badge bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Bawaan</span>}
             </div>
-            <p className="mt-3 text-sm text-slate-500">{r.description || "—"}</p>
-            <p className="mt-3 text-xs text-slate-400">{r.permissionIds.length} authority aktif</p>
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{r.description || "—"}</p>
+            <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">{r.permissionIds.length} authority aktif</p>
             <div className="mt-4 flex gap-2">
               <button className="btn-ghost flex-1 !py-2" onClick={() => openEdit(r)}>
                 <Pencil className="h-4 w-4" /> Atur
@@ -151,15 +151,15 @@ export function RolesPanel() {
 
           <div>
             <label className="label">Authority (Hak Akses)</label>
-            <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-slate-200 p-4">
+            <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               {Object.entries(groups).map(([group, list]) => (
                 <div key={group}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{group}</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{group}</p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {list.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                      <label key={p.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
                         <input type="checkbox" className="h-4 w-4 rounded" checked={form.permissionIds.includes(p.id)} onChange={() => togglePerm(p.id)} />
-                        <span className="text-slate-700">{p.label}</span>
+                        <span className="text-slate-700 dark:text-slate-200">{p.label}</span>
                       </label>
                     ))}
                   </div>

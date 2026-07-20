@@ -208,7 +208,7 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   <th className="px-5 py-3 font-medium">Nama</th>
                   <th className="px-5 py-3 font-medium">Role</th>
                   <th className="px-5 py-3 font-medium">Department</th>
@@ -218,17 +218,17 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                   {(perms.edit || perms.delete) && <th className="px-5 py-3" />}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50/60">
+                  <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+                        <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 dark:bg-brand-900/40 text-xs font-semibold text-brand-700 dark:text-brand-300">
                           {e.fullName.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium text-slate-800">{e.fullName}</p>
-                          <p className="text-xs text-slate-400">@{e.username}</p>
+                          <p className="font-medium text-slate-800 dark:text-slate-100">{e.fullName}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">@{e.username}</p>
                         </div>
                       </div>
                     </td>
@@ -237,16 +237,16 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                         {e.role.name}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{e.department?.name ?? "—"}</td>
-                    <td className="px-5 py-3 text-slate-600">{formatDate(e.joinDate)}</td>
-                    {perms.payroll && <td className="px-5 py-3 text-slate-600">{formatCurrency(e.baseSalary)}</td>}
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{e.department?.name ?? "—"}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{formatDate(e.joinDate)}</td>
+                    {perms.payroll && <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{formatCurrency(e.baseSalary)}</td>}
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">
-                        <span className={`badge ${e.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                        <span className={`badge ${e.isActive ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}>
                           {e.isActive ? "Aktif" : "Nonaktif"}
                         </span>
                         {e.employmentStatus !== "PEGAWAI_TETAP" && (
-                          <span className="badge bg-amber-50 text-amber-700" title={e.contractEndDate ? `Sampai ${formatDate(e.contractEndDate)}` : undefined}>
+                          <span className="badge bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" title={e.contractEndDate ? `Sampai ${formatDate(e.contractEndDate)}` : undefined}>
                             {EMPLOYMENT_STATUS_LABEL[e.employmentStatus]}
                           </span>
                         )}
@@ -256,17 +256,17 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-1">
                           {perms.edit && (
-                            <button onClick={() => openEdit(e)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-brand-600" title="Ubah">
+                            <button onClick={() => openEdit(e)} className="rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-600" title="Ubah">
                               <Pencil className="h-4 w-4" />
                             </button>
                           )}
                           {perms.delete && (
-                            <button onClick={() => toggleActive(e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100">
+                            <button onClick={() => toggleActive(e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
                               {e.isActive ? "Nonaktifkan" : "Aktifkan"}
                             </button>
                           )}
                           {perms.delete && (
-                            <button onClick={() => hardDelete(e)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus Permanen">
+                            <button onClick={() => hardDelete(e)} className="rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400" title="Hapus Permanen">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           )}
@@ -344,7 +344,7 @@ export function EmployeesClient({ perms }: { perms: { create: boolean; edit: boo
             )}
             {editing && (
               <div className="flex items-end">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                   <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((f: any) => ({ ...f, isActive: e.target.checked }))} className="h-4 w-4 rounded" />
                   Akun aktif
                 </label>

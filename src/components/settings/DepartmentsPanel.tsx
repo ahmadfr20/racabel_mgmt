@@ -56,16 +56,16 @@ export function DepartmentsPanel() {
           <Card key={d.id}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-50 text-brand-600">
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400">
                   <Building className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">{d.name}</p>
-                  <p className="text-xs text-slate-400">{d.userCount} karyawan</p>
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">{d.name}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{d.userCount} karyawan</p>
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-sm text-slate-500">{d.description || "—"}</p>
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{d.description || "—"}</p>
             <div className="mt-4 flex gap-2">
               <button className="btn-ghost flex-1 !py-2" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /> Ubah</button>
               <button className="btn-danger !px-3" onClick={() => remove(d)}><Trash2 className="h-4 w-4" /></button>

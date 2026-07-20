@@ -99,17 +99,17 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
           <Card className="lg:col-span-2">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-slate-500">Absensi hari ini · {formatDate(new Date())}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Absensi hari ini · {formatDate(new Date())}</p>
                 <div className="mt-2 flex items-center gap-6">
                   <div>
-                    <p className="text-xs text-slate-400">Check-in</p>
-                    <p className="text-xl font-bold text-slate-800">{att?.checkInAt ? formatTime(att.checkInAt) : "--:--"}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Check-in</p>
+                    <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{att?.checkInAt ? formatTime(att.checkInAt) : "--:--"}</p>
                     {att?.checkInStatus && <StatusBadge status={att.checkInStatus} label={STATUS_LABEL[att.checkInStatus]} />}
                   </div>
-                  <div className="h-10 w-px bg-slate-200" />
+                  <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
                   <div>
-                    <p className="text-xs text-slate-400">Check-out</p>
-                    <p className="text-xl font-bold text-slate-800">{att?.checkOutAt ? formatTime(att.checkOutAt) : "--:--"}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Check-out</p>
+                    <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{att?.checkOutAt ? formatTime(att.checkOutAt) : "--:--"}</p>
                     {att?.checkOutStatus && <StatusBadge status={att.checkOutStatus} label={STATUS_LABEL[att.checkOutStatus]} />}
                   </div>
                 </div>
@@ -124,14 +124,14 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
               </div>
             </div>
             {checkedOut && att && (
-              <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+              <p className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-sm text-slate-600 dark:text-slate-300">
                 Total kerja hari ini: <b>{minutesToLabel(att.workedMinutes)}</b>
               </p>
             )}
           </Card>
 
           <Card>
-            <div className="mb-2 flex items-center gap-2 text-slate-800">
+            <div className="mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
               <Clock className="h-4 w-4 text-brand-600" />
               <h3 className="font-semibold">Jadwal Anda</h3>
             </div>
@@ -147,20 +147,20 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
 
       {/* Riwayat */}
       <Card className="!p-0 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-100 dark:border-slate-700 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-brand-600" />
-            <h3 className="font-semibold text-slate-800">Riwayat Kehadiran</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">Riwayat Kehadiran</h3>
           </div>
           <div className="flex items-center gap-2">
             {canViewAll && canCheckin && (
-              <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
-                <button onClick={() => setScope("mine")} className={cn("rounded-md px-3 py-1 font-medium", scope === "mine" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>Saya</button>
-                <button onClick={() => setScope("all")} className={cn("rounded-md px-3 py-1 font-medium", scope === "all" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>Semua</button>
+              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1 text-sm">
+                <button onClick={() => setScope("mine")} className={cn("rounded-md px-3 py-1 font-medium", scope === "mine" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>Saya</button>
+                <button onClick={() => setScope("all")} className={cn("rounded-md px-3 py-1 font-medium", scope === "all" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>Semua</button>
               </div>
             )}
             <input type="date" className="input !py-1.5 !w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
-            {date && <button className="text-sm text-slate-400 hover:text-slate-600" onClick={() => setDate("")}>Reset</button>}
+            {date && <button className="text-sm text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => setDate("")}>Reset</button>}
           </div>
         </div>
 
@@ -170,7 +170,7 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   <th className="px-5 py-3 font-medium">Tanggal</th>
                   {scope === "all" && <th className="px-5 py-3 font-medium">Karyawan</th>}
                   <th className="px-5 py-3 font-medium">Masuk</th>
@@ -180,29 +180,29 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
                   {canManage && <th className="px-5 py-3" />}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {records.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/60">
-                    <td className="px-5 py-3 text-slate-600">{formatDate(r.date)}</td>
+                  <tr key={r.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{formatDate(r.date)}</td>
                     {scope === "all" && (
                       <td className="px-5 py-3">
-                        <p className="font-medium text-slate-800">{r.user.fullName}</p>
-                        <p className="text-xs text-slate-400">{r.user.department ?? "—"}</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-100">{r.user.fullName}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{r.user.department ?? "—"}</p>
                       </td>
                     )}
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-700">{formatTime(r.checkInAt)}</span>
+                        <span className="text-slate-700 dark:text-slate-200">{formatTime(r.checkInAt)}</span>
                         {r.checkInStatus && <StatusBadge status={r.checkInStatus} label={STATUS_LABEL[r.checkInStatus]} />}
                       </div>
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-700">{formatTime(r.checkOutAt)}</span>
+                        <span className="text-slate-700 dark:text-slate-200">{formatTime(r.checkOutAt)}</span>
                         {r.checkOutStatus && <StatusBadge status={r.checkOutStatus} label={STATUS_LABEL[r.checkOutStatus]} />}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{r.workedMinutes ? minutesToLabel(r.workedMinutes) : "-"}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{r.workedMinutes ? minutesToLabel(r.workedMinutes) : "-"}</td>
                     <td className="px-5 py-3">
                       <div className="flex gap-2">
                         {r.checkInAt ? (
@@ -221,7 +221,7 @@ export function AttendanceClient({ canCheckin, canViewAll, canManage = false }: 
                       <td className="px-5 py-3 text-right">
                         <button
                           onClick={() => removeRecord(r)}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          className="rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
                           title="Hapus data absensi"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -313,8 +313,8 @@ function EmptyThumb({ label }: { label: string }) {
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-500">{k}</dt>
-      <dd className="font-medium text-slate-800">{v}</dd>
+      <dt className="text-slate-500 dark:text-slate-400">{k}</dt>
+      <dd className="font-medium text-slate-800 dark:text-slate-100">{v}</dd>
     </div>
   );
 }

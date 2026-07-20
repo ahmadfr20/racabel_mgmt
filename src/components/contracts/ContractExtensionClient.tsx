@@ -72,11 +72,11 @@ export function ContractExtensionClient({ canRequest, canApprove }: { canRequest
 
       {canApprove && canRequest && (
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
-            <button onClick={() => setScope("mine")} className={cn("rounded-md px-4 py-1.5 font-medium", scope === "mine" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>Pengajuan Saya</button>
-            <button onClick={() => setScope("all")} className={cn("rounded-md px-4 py-1.5 font-medium", scope === "all" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>Semua Pengajuan</button>
+          <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1 text-sm">
+            <button onClick={() => setScope("mine")} className={cn("rounded-md px-4 py-1.5 font-medium", scope === "mine" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>Pengajuan Saya</button>
+            <button onClick={() => setScope("all")} className={cn("rounded-md px-4 py-1.5 font-medium", scope === "all" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>Semua Pengajuan</button>
           </div>
-          {scope === "all" && pendingCount > 0 && <span className="badge bg-amber-50 text-amber-700">{pendingCount} menunggu</span>}
+          {scope === "all" && pendingCount > 0 && <span className="badge bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">{pendingCount} menunggu</span>}
         </div>
       )}
 
@@ -95,14 +95,14 @@ export function ContractExtensionClient({ canRequest, canApprove }: { canRequest
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-800">Perpanjangan Kontrak</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-100">Perpanjangan Kontrak</p>
                       <StatusBadge status={l.status} label={STATUS_LABEL[l.status]} />
                     </div>
-                    {scope === "all" && <p className="text-xs text-slate-500">{l.user.fullName} · {l.user.department?.name ?? "—"}</p>}
-                    <p className="mt-1 text-sm text-slate-600">{formatDate(l.currentEndDate)} → {formatDate(l.requestedEndDate)}</p>
-                    <p className="mt-1 text-sm text-slate-500">{l.reason}</p>
+                    {scope === "all" && <p className="text-xs text-slate-500 dark:text-slate-400">{l.user.fullName} · {l.user.department?.name ?? "—"}</p>}
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{formatDate(l.currentEndDate)} → {formatDate(l.requestedEndDate)}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{l.reason}</p>
                     {l.reviewedBy && (
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                         Ditinjau oleh {l.reviewedBy.fullName}{l.reviewNote ? ` · "${l.reviewNote}"` : ""}
                       </p>
                     )}

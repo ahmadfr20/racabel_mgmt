@@ -51,12 +51,12 @@ export function PayrollClient({ canManage }: { canManage: boolean }) {
     <div>
       <PageHeader title="Kinerja & Penggajian" subtitle="Gaji dihitung dari gaji pokok + tunjangan kinerja × capaian berbobot." />
 
-      <div className="mb-6 flex gap-1 rounded-xl bg-slate-100 p-1">
-        <button onClick={() => setTab("payroll")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium", tab === "payroll" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>
+      <div className="mb-6 flex gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+        <button onClick={() => setTab("payroll")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium", tab === "payroll" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>
           <Wallet className="h-4 w-4" /> Penggajian
         </button>
         {canManage && (
-          <button onClick={() => setTab("kpi")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium", tab === "kpi" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500")}>
+          <button onClick={() => setTab("kpi")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium", tab === "kpi" ? "bg-white dark:bg-slate-700 text-brand-700 dark:text-brand-300 shadow-sm" : "text-slate-500 dark:text-slate-400")}>
             <SlidersHorizontal className="h-4 w-4" /> KPI & Bobot
           </button>
         )}
@@ -82,7 +82,7 @@ export function PayrollClient({ canManage }: { canManage: boolean }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <th className="px-5 py-3 font-medium">Karyawan</th>
                     <th className="px-5 py-3 font-medium">Gaji Pokok</th>
                     <th className="px-5 py-3 font-medium">Skor Kinerja</th>
@@ -91,24 +91,24 @@ export function PayrollClient({ canManage }: { canManage: boolean }) {
                     {canManage && <th className="px-5 py-3" />}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data?.rows.map((r) => (
-                    <tr key={r.userId} className="hover:bg-slate-50/60">
+                    <tr key={r.userId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3">
-                        <p className="font-medium text-slate-800">{r.fullName}</p>
-                        <p className="text-xs text-slate-400">{r.department ?? "—"} · {r.role}</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-100">{r.fullName}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{r.department ?? "—"} · {r.role}</p>
                       </td>
-                      <td className="px-5 py-3 text-slate-600">{formatCurrency(r.baseSalary)}</td>
+                      <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{formatCurrency(r.baseSalary)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
                             <div className="h-full rounded-full bg-brand-500" style={{ width: `${r.score}%` }} />
                           </div>
-                          <span className="text-xs font-medium text-slate-600">{r.score}</span>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{r.score}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-amber-600">{formatCurrency(r.performanceAmount)}</td>
-                      <td className="px-5 py-3 font-semibold text-slate-900">{formatCurrency(r.totalSalary)}</td>
+                      <td className="px-5 py-3 text-amber-600 dark:text-amber-400">{formatCurrency(r.performanceAmount)}</td>
+                      <td className="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(r.totalSalary)}</td>
                       {canManage && (
                         <td className="px-5 py-3 text-right">
                           <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={() => setScoreUser(r)}>
@@ -169,26 +169,26 @@ function ScoreModal({ user, period, onClose, onSaved }: { user: PayrollRow; peri
   return (
     <Modal open onClose={onClose} title={`Input Capaian — ${user.fullName}`}>
       <div className="space-y-4">
-        <p className="text-sm text-slate-500">Periode {period}. Masukkan capaian tiap KPI manual (0–100); KPI otomatis dihitung dari data sistem.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Periode {period}. Masukkan capaian tiap KPI manual (0–100); KPI otomatis dihitung dari data sistem.</p>
         {metrics.map((m, i) => (
           <div key={m.id}>
             <div className="mb-1 flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5 font-medium text-slate-700">
+              <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
                 {m.name}
                 {m.isAuto && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-500" title={`Otomatis berdasarkan ${AUTO_SOURCE_LABEL[m.autoSource ?? ""] ?? m.autoSource} bulan ini`}>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-normal text-slate-500 dark:text-slate-400" title={`Otomatis berdasarkan ${AUTO_SOURCE_LABEL[m.autoSource ?? ""] ?? m.autoSource} bulan ini`}>
                     <Lock className="h-2.5 w-2.5" /> Otomatis
                   </span>
                 )}
               </span>
-              <span className="text-xs text-slate-400">bobot {m.weight}%</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">bobot {m.weight}%</span>
             </div>
             {m.isAuto ? (
               <div className="flex items-center gap-3">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
                   <div className="h-full rounded-full bg-slate-400" style={{ width: `${m.score}%` }} />
                 </div>
-                <span className="w-14 text-right text-sm font-medium text-slate-600">{m.score}</span>
+                <span className="w-14 text-right text-sm font-medium text-slate-600 dark:text-slate-300">{m.score}</span>
               </div>
             ) : (
               <div className="flex items-center gap-3">
@@ -311,11 +311,11 @@ function KpiPanel() {
                     {k.assignedUserName ? `Khusus: ${k.assignedUserName}` : "Umum"}
                   </span>
                   {k.isAuto && (
-                    <span className="badge inline-flex items-center gap-1 bg-amber-50 text-amber-700" title={`Skor dihitung otomatis dari ${AUTO_SOURCE_LABEL[k.autoSource ?? ""] ?? k.autoSource}`}>
+                    <span className="badge inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" title={`Skor dihitung otomatis dari ${AUTO_SOURCE_LABEL[k.autoSource ?? ""] ?? k.autoSource}`}>
                       <Lock className="h-3 w-3" /> Otomatis
                     </span>
                   )}
-                  {!k.active && <span className="badge bg-slate-100 text-slate-500">Nonaktif</span>}
+                  {!k.active && <span className="badge bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Nonaktif</span>}
                 </div>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-400">{k.description || "—"}</p>
               </div>

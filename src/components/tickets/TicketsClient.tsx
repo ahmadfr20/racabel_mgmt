@@ -447,7 +447,7 @@ function DetailBody({
           <button className="btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 !py-2" disabled={busy} onClick={onResolve}><Check className="h-4 w-4" /> Tandai Selesai</button>
         )}
         {(canManage || isRequester) && detail.status === "RESOLVED" && (
-          <button className="btn bg-slate-100 text-slate-700 hover:bg-slate-200 !py-2" disabled={busy} onClick={() => onChangeStatus("CLOSED")}>Tutup Tiket</button>
+          <button className="btn bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 !py-2" disabled={busy} onClick={() => onChangeStatus("CLOSED")}>Tutup Tiket</button>
         )}
         {(canManage || isRequester) && (detail.status === "RESOLVED" || detail.status === "CLOSED") && (
           <button className="btn bg-blue-50 text-blue-700 hover:bg-blue-100 !py-2" disabled={busy} onClick={() => onChangeStatus("OPEN")}>Buka Kembali</button>

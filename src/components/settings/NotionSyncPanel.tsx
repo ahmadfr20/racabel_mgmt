@@ -25,15 +25,15 @@ interface SyncResponse {
 function ResultSummary({ label, result }: { label: string; result: SyncResult }) {
   const skippedDetails = result.details.filter((d) => d.action === "skipped");
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <h4 className="font-semibold text-slate-800">{label}</h4>
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+      <h4 className="font-semibold text-slate-800 dark:text-slate-100">{label}</h4>
       <div className="mt-2 flex gap-4 text-sm">
-        <span className="text-emerald-600">Baru: {result.created}</span>
-        <span className="text-brand-600">Diperbarui: {result.updated}</span>
-        <span className="text-amber-600">Dilewati: {result.skipped}</span>
+        <span className="text-emerald-600 dark:text-emerald-400">Baru: {result.created}</span>
+        <span className="text-brand-600 dark:text-brand-400">Diperbarui: {result.updated}</span>
+        <span className="text-amber-600 dark:text-amber-400">Dilewati: {result.skipped}</span>
       </div>
       {skippedDetails.length > 0 && (
-        <ul className="mt-3 space-y-1 text-xs text-slate-500">
+        <ul className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
           {skippedDetails.map((d) => (
             <li key={d.notionPageId}>
               <b>{d.title}</b> — {d.reason}
@@ -67,8 +67,8 @@ export function NotionSyncPanel() {
     <Card>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-slate-800">Sinkronisasi Notion</h3>
-          <p className="text-sm text-slate-500">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Sinkronisasi Notion</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Tarik data dari workspace Notion Racabel (Task Management System &amp; PDCA) satu arah ke aplikasi ini.
             Perubahan di aplikasi tidak dikirim balik ke Notion. Sinkron otomatis berjalan tiap 15 menit di
             server; tombol ini untuk sinkron manual seketika.
@@ -79,7 +79,7 @@ export function NotionSyncPanel() {
         </button>
       </div>
 
-      {error && <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       {result && (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -88,7 +88,7 @@ export function NotionSyncPanel() {
         </div>
       )}
 
-      <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+      <p className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-500 dark:text-slate-400">
         Pencocokan PIC dilakukan lewat email Notion vs email user di app. Item dengan PIC yang emailnya belum
         terdaftar di app, atau belum punya department, akan dilewati (lihat daftar &quot;Dilewati&quot;).
       </p>

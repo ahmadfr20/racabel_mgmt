@@ -72,7 +72,7 @@ export function SchedulePanel() {
       <Card className="lg:col-span-2">
         <div className="mb-4 flex items-center gap-2">
           <Clock className="h-5 w-5 text-brand-600" />
-          <h3 className="font-semibold text-slate-800">Atur Jam Masuk & Toleransi</h3>
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Atur Jam Masuk & Toleransi</h3>
         </div>
 
         <label className="label">Berlaku untuk</label>
@@ -108,7 +108,7 @@ export function SchedulePanel() {
                 key={d.v}
                 type="button"
                 onClick={() => toggleDay(d.v)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${days.includes(d.v) ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500"}`}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${days.includes(d.v) ? "bg-brand-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}
               >
                 {d.l}
               </button>
@@ -126,8 +126,8 @@ export function SchedulePanel() {
       </Card>
 
       <Card>
-        <h3 className="mb-3 font-semibold text-slate-800">Aturan Penilaian</h3>
-        <ul className="space-y-3 text-sm text-slate-600">
+        <h3 className="mb-3 font-semibold text-slate-800 dark:text-slate-100">Aturan Penilaian</h3>
+        <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <li className="flex gap-2">
             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
             <span><b>Tepat Waktu</b>: check-in ≤ jam masuk + toleransi.</span>
@@ -141,7 +141,7 @@ export function SchedulePanel() {
             <span><b>Pulang Cepat</b>: check-out sebelum jam pulang − toleransi.</span>
           </li>
         </ul>
-        <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+        <p className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-500 dark:text-slate-400">
           Jadwal khusus department menimpa jadwal global. Bila department tidak punya jadwal khusus, dipakai default global.
         </p>
       </Card>
