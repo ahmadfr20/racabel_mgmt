@@ -27,6 +27,9 @@ export function downloadPdfTable(opts: {
   subtitle?: string;
   head: string[];
   body: (string | number)[][];
+  // Tabel tambahan yang dirender setelah tabel utama (mis. ringkasan per bulan), tiap
+  // satu diberi judul kecil sendiri dan otomatis pindah halaman bila tak cukup ruang.
+  extraTables?: { title: string; head: string[]; body: (string | number)[][] }[];
 }) {
   const doc = new jsPDF({ orientation: "landscape" });
   doc.setFontSize(14);
@@ -43,6 +46,23 @@ export function downloadPdfTable(opts: {
     styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
     headStyles: { fillColor: [79, 70, 229] },
   });
+
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (const extra of opts.extraTables ?? []) {
+    let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+    if (y > pageHeight - 30) { doc.addPage(); y = 18; }
+    doc.setFontSize(11);
+    doc.setTextColor(20);
+    doc.text(extra.title, 14, y);
+    autoTable(doc, {
+      startY: y + 4,
+      head: [extra.head],
+      body: extra.body,
+      styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+      headStyles: { fillColor: [79, 70, 229] },
+    });
+  }
+
   doc.save(opts.filename.endsWith(".pdf") ? opts.filename : `${opts.filename}.pdf`);
 }
 

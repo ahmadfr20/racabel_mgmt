@@ -12,6 +12,63 @@ import {
   propDateEnd,
 } from "@/lib/notion";
 
+// ── Pengaturan interval sinkron otomatis (disimpan di AppConfig, key-value) ──
+// Cron job di server nge-tick tiap 5 menit (lihat crontab), tapi sinkron beneran cuma
+// dijalankan kalau sudah lewat `intervalMinutes` sejak run terakhir — jadi intervalnya
+// bisa diatur dari UI tanpa perlu ubah crontab server tiap kali.
+const INTERVAL_KEY = "notion_sync_interval_minutes";
+const LAST_RUN_KEY = "notion_sync_last_run_at";
+const DEFAULT_INTERVAL_MINUTES = 60;
+export const MIN_INTERVAL_MINUTES = 5;
+export const MAX_INTERVAL_MINUTES = 1440; // 24 jam
+
+export async function getSyncIntervalMinutes(): Promise<number> {
+  const row = await prisma.appConfig.findUnique({ where: { key: INTERVAL_KEY } });
+  const n = row ? Number(row.value) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_INTERVAL_MINUTES;
+}
+
+export async function setSyncIntervalMinutes(minutes: number): Promise<void> {
+  const clamped = Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(minutes)));
+  await prisma.appConfig.upsert({
+    where: { key: INTERVAL_KEY },
+    create: { key: INTERVAL_KEY, value: String(clamped) },
+    update: { value: String(clamped) },
+  });
+}
+
+export async function getLastAutoSyncedAt(): Promise<Date | null> {
+  const row = await prisma.appConfig.findUnique({ where: { key: LAST_RUN_KEY } });
+  return row ? new Date(row.value) : null;
+}
+
+async function markAutoSynced(): Promise<void> {
+  const now = new Date().toISOString();
+  await prisma.appConfig.upsert({
+    where: { key: LAST_RUN_KEY },
+    create: { key: LAST_RUN_KEY, value: now },
+    update: { value: now },
+  });
+}
+
+// Dipanggil oleh cron endpoint tiap tick. Kalau sudah waktunya (berdasar interval yang
+// diatur di UI), jalankan sync beneran & catat waktunya; kalau belum, cuma dilewati (murah,
+// tidak memanggil API Notion sama sekali).
+export async function runScheduledSyncIfDue(): Promise<
+  | { ran: true; result: { task: SyncResult; pdca: SyncResult } }
+  | { ran: false; nextDueInMinutes: number }
+> {
+  const [intervalMinutes, lastRun] = await Promise.all([getSyncIntervalMinutes(), getLastAutoSyncedAt()]);
+  const dueAt = lastRun ? lastRun.getTime() + intervalMinutes * 60_000 : 0;
+  const now = Date.now();
+  if (now < dueAt) {
+    return { ran: false, nextDueInMinutes: Math.ceil((dueAt - now) / 60_000) };
+  }
+  const result = await syncNotionAll();
+  await markAutoSynced();
+  return { ran: true, result };
+}
+
 interface SyncItemResult {
   notionPageId: string;
   title: string;

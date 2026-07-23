@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Pencil, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, FileDown, FileSpreadsheet, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/http";
 import { formatDate, cn } from "@/lib/utils";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { Modal } from "@/components/Modal";
+import { downloadExcel, downloadPdfTable } from "@/lib/exportFile";
 
 interface TaskLog {
   id: number;
   userId: number;
   userName: string;
+  departmentId: number | null;
+  departmentName: string | null;
   date: string;
   title: string;
   description: string | null;
@@ -31,6 +34,7 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
   const [list, setList] = useState<TaskLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -47,25 +51,70 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
   }
   useEffect(() => { load(); }, []);
 
-  // Opsi filter karyawan diturunkan dari data yang termuat (untuk manajer).
+  // Opsi filter karyawan & department diturunkan dari data yang termuat (untuk manajer).
   const people = useMemo(() => {
     const m = new Map<number, string>();
     list.forEach((l) => m.set(l.userId, l.userName));
     return Array.from(m.entries()).map(([id, name]) => ({ id, name }));
   }, [list]);
 
+  const departments = useMemo(() => {
+    const m = new Map<number, string>();
+    list.forEach((l) => { if (l.departmentId) m.set(l.departmentId, l.departmentName!); });
+    return Array.from(m.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [list]);
+
   const filtered = useMemo(
     () =>
       list.filter((l) => {
         if (userFilter && String(l.userId) !== userFilter) return false;
+        if (deptFilter && String(l.departmentId) !== deptFilter) return false;
         if (statusFilter && l.status !== statusFilter) return false;
         const d = l.date.slice(0, 10);
         if (dateFrom && d < dateFrom) return false;
         if (dateTo && d > dateTo) return false;
         return true;
       }),
-    [list, userFilter, statusFilter, dateFrom, dateTo]
+    [list, userFilter, deptFilter, statusFilter, dateFrom, dateTo]
   );
+
+  // Ekspor mengikuti data yang sedang ditampilkan (hasil filter aktif).
+  function exportExcel() {
+    downloadExcel("task-log-harian", [{
+      name: "Task Log",
+      rows: filtered.map((t) => ({
+        Tanggal: formatDate(t.date),
+        ...(canViewAll ? { Karyawan: t.userName, Department: t.departmentName ?? "—" } : {}),
+        Tugas: t.title,
+        Deskripsi: t.description ?? "",
+        Status: STATUS[t.status].label,
+        Jam: t.hours ?? "",
+      })),
+    }]);
+  }
+
+  function exportPdf() {
+    const head = ["Tanggal", ...(canViewAll ? ["Karyawan", "Department"] : []), "Tugas", "Status", "Jam"];
+    downloadPdfTable({
+      filename: "task-log-harian",
+      title: "Task Log Harian",
+      subtitle: [
+        userFilter && `Karyawan: ${people.find((p) => String(p.id) === userFilter)?.name ?? ""}`,
+        deptFilter && `Department: ${departments.find((d) => String(d.id) === deptFilter)?.name ?? ""}`,
+        statusFilter && `Status: ${STATUS[statusFilter as keyof typeof STATUS].label}`,
+        dateFrom && `Dari: ${formatDate(dateFrom)}`,
+        dateTo && `Sampai: ${formatDate(dateTo)}`,
+      ].filter(Boolean).join(" · ") || undefined,
+      head,
+      body: filtered.map((t) => [
+        formatDate(t.date),
+        ...(canViewAll ? [t.userName, t.departmentName ?? "—"] : []),
+        t.title,
+        STATUS[t.status].label,
+        t.hours != null ? `${t.hours}j` : "—",
+      ]),
+    });
+  }
 
   function openCreate() { setEditing(null); setForm({ ...EMPTY, date: todayISO() }); setError(""); setOpen(true); }
   function openEdit(t: TaskLog) {
@@ -104,11 +153,25 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
       <PageHeader
         title="Task Log Harian"
         subtitle="Catat pekerjaan harian Anda. Manajer dapat memantau seluruh tim."
-        action={canWrite && (
-          <button className="btn-primary" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Tambah Task
-          </button>
-        )}
+        action={
+          <div className="flex items-center gap-2">
+            {list.length > 0 && (
+              <>
+                <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={exportExcel}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                </button>
+                <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={exportPdf}>
+                  <FileDown className="h-3.5 w-3.5" /> PDF
+                </button>
+              </>
+            )}
+            {canWrite && (
+              <button className="btn-primary" onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Tambah Task
+              </button>
+            )}
+          </div>
+        }
       />
 
       <Card className="mb-4 !p-3">
@@ -119,6 +182,15 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
               <select className="input !w-auto" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
                 <option value="">Semua karyawan</option>
                 {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+          {canViewAll && departments.length > 0 && (
+            <div>
+              <label className="label">Department</label>
+              <select className="input !w-auto" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+                <option value="">Semua department</option>
+                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
           )}
@@ -139,11 +211,11 @@ export function TaskLogClient({ canViewAll, canWrite }: { canViewAll: boolean; c
             <label className="label">Sampai tanggal</label>
             <input className="input !w-auto" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          {(userFilter || statusFilter || dateFrom || dateTo) && (
+          {(userFilter || deptFilter || statusFilter || dateFrom || dateTo) && (
             <button
               type="button"
               className="btn-ghost"
-              onClick={() => { setUserFilter(""); setStatusFilter(""); setDateFrom(""); setDateTo(""); }}
+              onClick={() => { setUserFilter(""); setDeptFilter(""); setStatusFilter(""); setDateFrom(""); setDateTo(""); }}
             >
               Reset Filter
             </button>

@@ -27,7 +27,7 @@ export const GET = handle(async (req: NextRequest) => {
         ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } }
         : {}),
     },
-    include: { user: { select: { id: true, fullName: true } } },
+    include: { user: { select: { id: true, fullName: true, department: { select: { id: true, name: true } } } } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 300,
   });
@@ -37,6 +37,8 @@ export const GET = handle(async (req: NextRequest) => {
       id: l.id,
       userId: l.userId,
       userName: l.user.fullName,
+      departmentId: l.user.department?.id ?? null,
+      departmentName: l.user.department?.name ?? null,
       date: l.date,
       title: l.title,
       description: l.description,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FileSpreadsheet, GitCompareArrows, Loader2, TrendingDown, TrendingUp, Trash2, Wallet,
   FileText, BookOpen, Lock, Globe, FileDown,
@@ -184,30 +184,6 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
     }
   }
 
-  function exportImportDetail(detail: ImportDetail, fmt: "excel" | "pdf") {
-    const fname = `hasil-ekstraksi-${detail.fileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
-    if (fmt === "excel") {
-      downloadExcel(fname, [{
-        name: "Transaksi",
-        rows: detail.transactions.map((t) => ({
-          Tanggal: formatDate(t.date), Deskripsi: t.description, Kategori: t.category,
-          Jenis: t.type === "INCOME" ? "Pemasukan" : "Pengeluaran", Nominal: t.amount, Catatan: t.notes ?? "",
-        })),
-      }]);
-    } else {
-      downloadPdfTable({
-        filename: fname,
-        title: `Hasil Ekstraksi — ${detail.fileName}`,
-        subtitle: `Total Pemasukan ${formatCurrency(detail.totalIncome)} · Total Pengeluaran ${formatCurrency(detail.totalExpense)}`,
-        head: ["Tanggal", "Deskripsi", "Kategori", "Jenis", "Nominal", "Catatan"],
-        body: detail.transactions.map((t) => [
-          formatDate(t.date), t.description, t.category, t.type === "INCOME" ? "Pemasukan" : "Pengeluaran",
-          formatCurrency(t.amount), t.notes ?? "",
-        ]),
-      });
-    }
-  }
-
   function exportComparisons(fmt: "excel" | "pdf") {
     if (fmt === "excel") {
       downloadExcel("riwayat-komparasi-keuangan", [{
@@ -268,8 +244,6 @@ export function AIAssistantClient({ canUpload }: { canUpload: boolean }) {
           detail={selected}
           onDelete={canUpload && selected.isOwner ? () => removeImport(selected.id) : undefined}
           onToggleVisibility={() => toggleImportVisibility(selected)}
-          onExportExcel={() => exportImportDetail(selected, "excel")}
-          onExportPdf={() => exportImportDetail(selected, "pdf")}
         />
       )}
 
@@ -557,13 +531,100 @@ function SopStatusBadge({ status }: { status: SopPlan["status"] }) {
   return <span className={cn("badge", map[status])}>{label[status]}</span>;
 }
 
+// "yyyy-MM" dari tanggal transaksi — dipakai sebagai key pengelompokan & filter bulan.
+function monthKey(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function monthLabel(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+}
+
 function ImportResult({
-  detail, onDelete, onToggleVisibility, onExportExcel, onExportPdf,
+  detail, onDelete, onToggleVisibility,
 }: {
   detail: ImportDetail; onDelete?: () => void; onToggleVisibility: () => void;
-  onExportExcel: () => void; onExportPdf: () => void;
 }) {
-  const net = detail.totalIncome - detail.totalExpense;
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+
+  const categories = useMemo(
+    () => Array.from(new Set(detail.transactions.map((t) => t.category))).sort(),
+    [detail.transactions]
+  );
+
+  // Ringkasan per bulan mengikuti filter kategori saja (bukan filter bulan), supaya tetap
+  // jadi gambaran menyeluruh sekalipun tabel transaksi sedang dipersempit ke satu bulan.
+  const monthlyBreakdown = useMemo(() => {
+    const byCategory = categoryFilter ? detail.transactions.filter((t) => t.category === categoryFilter) : detail.transactions;
+    const map = new Map<string, { income: number; expense: number }>();
+    for (const t of byCategory) {
+      const key = monthKey(t.date);
+      const cur = map.get(key) ?? { income: 0, expense: 0 };
+      if (t.type === "INCOME") cur.income += t.amount; else cur.expense += t.amount;
+      map.set(key, cur);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, v]) => ({ key, label: monthLabel(key), income: v.income, expense: v.expense, net: v.income - v.expense }));
+  }, [detail.transactions, categoryFilter]);
+
+  const filteredTransactions = useMemo(
+    () =>
+      detail.transactions.filter((t) => {
+        if (categoryFilter && t.category !== categoryFilter) return false;
+        if (monthFilter && monthKey(t.date) !== monthFilter) return false;
+        return true;
+      }),
+    [detail.transactions, categoryFilter, monthFilter]
+  );
+
+  const filteredIncome = filteredTransactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.amount, 0);
+  const filteredExpense = filteredTransactions.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.amount, 0);
+  const filteredNet = filteredIncome - filteredExpense;
+  const hasFilter = !!(categoryFilter || monthFilter);
+
+  function handleExportExcel() {
+    const fname = `hasil-ekstraksi-${detail.fileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+    downloadExcel(fname, [
+      {
+        name: "Transaksi",
+        rows: filteredTransactions.map((t) => ({
+          Tanggal: formatDate(t.date), Deskripsi: t.description, Kategori: t.category,
+          Jenis: t.type === "INCOME" ? "Pemasukan" : "Pengeluaran", Nominal: t.amount, Catatan: t.notes ?? "",
+        })),
+      },
+      {
+        name: "Ringkasan per Bulan",
+        rows: monthlyBreakdown.map((m) => ({ Bulan: m.label, Pemasukan: m.income, Pengeluaran: m.expense, Net: m.net })),
+      },
+    ]);
+  }
+
+  function handleExportPdf() {
+    const fname = `hasil-ekstraksi-${detail.fileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+    const filterNote = [
+      categoryFilter && `Kategori: ${categoryFilter}`,
+      monthFilter && `Bulan: ${monthLabel(monthFilter)}`,
+    ].filter(Boolean).join(" · ");
+    downloadPdfTable({
+      filename: fname,
+      title: `Hasil Ekstraksi — ${detail.fileName}`,
+      subtitle: `Total Pemasukan ${formatCurrency(filteredIncome)} · Total Pengeluaran ${formatCurrency(filteredExpense)}${filterNote ? ` · ${filterNote}` : ""}`,
+      head: ["Tanggal", "Deskripsi", "Kategori", "Jenis", "Nominal", "Catatan"],
+      body: filteredTransactions.map((t) => [
+        formatDate(t.date), t.description, t.category, t.type === "INCOME" ? "Pemasukan" : "Pengeluaran",
+        formatCurrency(t.amount), t.notes ?? "",
+      ]),
+      extraTables: [{
+        title: "Ringkasan per Bulan",
+        head: ["Bulan", "Pemasukan", "Pengeluaran", "Net"],
+        body: monthlyBreakdown.map((m) => [m.label, formatCurrency(m.income), formatCurrency(m.expense), formatCurrency(m.net)]),
+      }],
+    });
+  }
+
   return (
     <div className="mb-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -575,7 +636,7 @@ function ImportResult({
           <p className="text-xs text-slate-400">Diunggah oleh {detail.uploadedBy.fullName} · {formatDate(detail.createdAt, true)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons onExcel={onExportExcel} onPdf={onExportPdf} />
+          <ExportButtons onExcel={handleExportExcel} onPdf={handleExportPdf} />
           {onDelete && (
             <button className="btn-ghost !py-1.5 !px-3 text-xs text-red-600" onClick={onDelete}>
               <Trash2 className="h-3.5 w-3.5" /> Hapus Riwayat Ini
@@ -583,16 +644,79 @@ function ImportResult({
           )}
         </div>
       </div>
+
+      {/* Filter kategori & bulan — totals & tabel di bawah mengikuti filter ini. */}
+      <Card className="mb-4 !p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="label">Kategori</label>
+            <select className="input !w-auto" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">Semua kategori</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Bulan</label>
+            <select className="input !w-auto" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+              <option value="">Semua bulan</option>
+              {monthlyBreakdown.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+          {hasFilter && (
+            <button type="button" className="btn-ghost" onClick={() => { setCategoryFilter(""); setMonthFilter(""); }}>
+              Reset Filter
+            </button>
+          )}
+        </div>
+      </Card>
+
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total Pemasukan" value={formatCurrency(detail.totalIncome)} tone="green" icon={<TrendingUp className="h-5 w-5" />} />
-        <StatCard label="Total Pengeluaran" value={formatCurrency(detail.totalExpense)} tone="red" icon={<TrendingDown className="h-5 w-5" />} />
-        <StatCard label="Selisih (Net)" value={formatCurrency(net)} tone={net >= 0 ? "brand" : "amber"} icon={<Wallet className="h-5 w-5" />} />
+        <StatCard label={hasFilter ? "Pemasukan (filter)" : "Total Pemasukan"} value={formatCurrency(filteredIncome)} tone="green" icon={<TrendingUp className="h-5 w-5" />} />
+        <StatCard label={hasFilter ? "Pengeluaran (filter)" : "Total Pengeluaran"} value={formatCurrency(filteredExpense)} tone="red" icon={<TrendingDown className="h-5 w-5" />} />
+        <StatCard label="Selisih (Net)" value={formatCurrency(filteredNet)} tone={filteredNet >= 0 ? "brand" : "amber"} icon={<Wallet className="h-5 w-5" />} />
       </div>
+
       {detail.aiNotes && (
         <div className="mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <span className="font-medium">Catatan AI: </span>{detail.aiNotes}
         </div>
       )}
+
+      {/* Ringkasan per bulan (mengikuti filter kategori) */}
+      <Card className="!p-0 overflow-hidden mb-4">
+        <div className="border-b border-slate-100 dark:border-slate-700 px-5 py-4">
+          <h4 className="font-semibold text-slate-800 dark:text-slate-100">
+            Total per Bulan{categoryFilter && ` — Kategori: ${categoryFilter}`}
+          </h4>
+        </div>
+        {monthlyBreakdown.length === 0 ? (
+          <p className="px-5 py-6 text-center text-sm text-slate-400">Tidak ada data.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <th className="px-5 py-3 font-medium">Bulan</th>
+                  <th className="px-5 py-3 font-medium text-right">Pemasukan</th>
+                  <th className="px-5 py-3 font-medium text-right">Pengeluaran</th>
+                  <th className="px-5 py-3 font-medium text-right">Net</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {monthlyBreakdown.map((m) => (
+                  <tr key={m.key} className={cn("hover:bg-slate-50/60 dark:hover:bg-slate-800/40", monthFilter === m.key && "bg-brand-50/60 dark:bg-brand-900/20")}>
+                    <td className="px-5 py-3 text-slate-800 dark:text-slate-100">{m.label}</td>
+                    <td className="px-5 py-3 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(m.income)}</td>
+                    <td className="px-5 py-3 text-right text-red-600 dark:text-red-400">{formatCurrency(m.expense)}</td>
+                    <td className={cn("px-5 py-3 text-right font-medium", m.net >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-400")}>{formatCurrency(m.net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       <Card className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -606,7 +730,7 @@ function ImportResult({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {detail.transactions.map((t) => (
+              {filteredTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                   <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
                   <td className="px-5 py-3">
@@ -624,8 +748,8 @@ function ImportResult({
                   </td>
                 </tr>
               ))}
-              {detail.transactions.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">Tidak ada transaksi yang berhasil diekstrak.</td></tr>
+              {filteredTransactions.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">{detail.transactions.length === 0 ? "Tidak ada transaksi yang berhasil diekstrak." : "Tidak ada transaksi yang cocok dengan filter."}</td></tr>
               )}
             </tbody>
           </table>
